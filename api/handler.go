@@ -60,7 +60,7 @@ func UploadPaint(c *gin.Context) {
 
 // 删画
 func Delect(c *gin.Context) {
-	username, err1 := c.Get("username")
+	username, err1 := c.Get("username") //获取当前登录用户的username
 	if !err1 {
 		c.JSON(400, gin.H{"error": "用户名不存在"})
 		return
@@ -70,19 +70,12 @@ func Delect(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "用户名格式错误"})
 		return
 	}
-
-	workname, err2 := c.Get("title")
-	if !err2 {
+	var w model.Work
+	if err := c.ShouldBindJSON(&w); err != nil {
 		c.JSON(400, gin.H{"error": "作品名不存在"})
 		return
 	}
-	work, ok2 := workname.(string)
-	if !ok2 {
-		c.JSON(400, gin.H{"error": "作品名不存在"})
-		return
-	}
-
-	last := dao.DelectPaint(name, work)
+	last := dao.DelectPaint(name, w.Title)
 	if !last {
 		c.JSON(400, gin.H{"error": "删除失败"})
 		return
