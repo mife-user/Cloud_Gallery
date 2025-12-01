@@ -84,3 +84,15 @@ func AddUser(username, password string) bool {
 func GetWorks(username string) []model.Work {
 	return WorksMap[username] // 直接返回这个人的作品切片
 }
+
+// 删除画作
+func DelectPaint(username string, workname string) bool {
+	for num := range WorksMap[username] {
+		if WorksMap[username][num].Title == workname {
+			WorksMap[username] = append(WorksMap[username][:num], WorksMap[username][num+1:]...)
+			Save()
+			return true
+		}
+	}
+	return false
+}
