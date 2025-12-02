@@ -4,9 +4,17 @@ import (
 	"painting/dao"
 	"painting/model"
 	"painting/utils"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// 定义前端传来的参数结构（DTO）
+type CommentRequest struct {
+	TargetAuthor string `json:"target_author"` // 评论谁的画
+	WorkTitle    string `json:"work_title"`    // 哪幅画
+	Content      string `json:"content"`       // 评论内容
+}
 
 // 注册
 func Register(c *gin.Context) {
@@ -88,4 +96,31 @@ func View(c *gin.Context) {
 	who := c.Param("who") //获取路径中的而非上下文中的
 	works := dao.GetWorks(who)
 	c.JSON(200, gin.H{"owner": who, "works": works})
+}
+
+// 评论（需要登录）
+func PostComment(c *gin.Context) {
+	//当前登录者
+	username, ok := c.Get("username")
+	if !ok {
+		c.JSON(400, gin.H{"error": "登录名错误"})
+		return
+	}
+	commentator := username.(string)
+	var req CommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "参数没填对"})
+		return
+	}
+	newComment := model.Comment{
+		FromUser:  commentator,
+		Content:   req.Content,
+		CreatedAt: time.Now(),
+	}
+	succeces := dao.AddComment(req.TargetAuthor, req.WorkTitle, newComment)
+	if succeces {
+		c.JSON(200, gin.H{"message": "评论成功", "data": newComment})
+	} else {
+		c.JSON(404, gin.H{"error": "找不到这幅画"})
+	}
 }

@@ -22,7 +22,8 @@ type DataStorage struct {
 	Works map[string][]model.Work `json:"works"`
 }
 
-func Init() { //初始化
+func Init() {
+	//初始化
 	file, err := os.ReadFile(dbFile) //打开数据库dbFile放入file中
 	if err == nil {                  //无错
 		var data DataStorage        //声明临时数据库结构
@@ -54,14 +55,16 @@ func Save() {
 }
 
 // 实现添加作品逻辑
-func AddWork(username string, work model.Work) { //参数为要保存的数据，参考model中，从此处可以看出model用于定义数据结构
+func AddWork(username string, work model.Work) {
+	//参数为要保存的数据，参考model中，从此处可以看出model用于定义数据结构
 	work.Author = username                                //此处为本项目特殊要求，因为work数据结构中需要作者名
 	WorksMap[username] = append(WorksMap[username], work) //将work放入传输数据中
 	Save()                                                //将传输数据保存
 }
 
 // 查人（给登录用）
-func CheckUser(username, password string) bool { //通过从context读入username
+func CheckUser(username, password string) bool {
+	//通过从context读入username
 	// ok 代表 map 里有没有这个 key（人存不存在）
 	// pwd 是 map 里存的真密码
 	if pwd, ok := UserMap[username]; ok && pwd == password {
@@ -90,6 +93,21 @@ func DelectPaint(username string, workname string) bool {
 	for num := range WorksMap[username] {
 		if WorksMap[username][num].Title == workname {
 			WorksMap[username] = append(WorksMap[username][:num], WorksMap[username][num+1:]...)
+			Save()
+			return true
+		}
+	}
+	return false
+}
+
+// 添加评论
+func AddComment(username string, workname string, comment model.Comment) bool {
+	paintMu.Lock()
+	defer paintMu.Unlock()
+	for num := range WorksMap[username] {
+		if WorksMap[username][num].Title == workname {
+			WorksMap[username][num].Comments = append(WorksMap[username][num].Comments, comment)
+			WorksMap[username] = WorksMap[username]
 			Save()
 			return true
 		}
