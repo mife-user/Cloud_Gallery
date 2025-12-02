@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云端画廊系统</title>
+    <style>
+        /* --- 基础样式 --- */
+        :root { --primary: #4f46e5; --bg: #f3f4f6; --white: #ffffff; }
+        body { font-family: sans-serif; background: var(--bg); margin: 0; padding-bottom: 50px; }
+        
+        header { background: var(--white); padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: var(--white); padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 2rem; }
+        
+        input, textarea { width: 100%; padding: 0.8rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;}
+        button { background: var(--primary); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 4px; cursor: pointer; }
+        button:hover { opacity: 0.9; }
+        button.danger { background: #ef4444; margin-top: 10px; width: 100%;}
+        
+        .hidden { display: none !important; }
+
+        /* --- 画廊样式 --- */
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; }
+        .art-item { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .art-item:hover { transform: translateY(-3px); }
+        
+        /* 图片样式：增加 cursor: pointer 暗示可点击 */
+        .art-img { width: 100%; height: 200px; object-fit: cover; cursor: zoom-in; }
+        
+        .art-info { padding: 1rem; }
+        .art-title { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
+        .art-desc { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
+
+        /* --- 图片放大遮罩层 (Lightbox) --- */
+        #lightbox {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9); /* 黑色半透明背景 */
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; cursor: zoom-out;
+        }
+        #lightbox img {
+            max-width: 90%; max-height: 90%;
+            border-radius: 4px; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <!-- 图片放大遮罩层 (默认隐藏) -->
+    <div id="lightbox" class="hidden" onclick="closeLightbox()">
+        <img id="lightbox-img" src="" alt="大图">
+    </div>
+
+    <header>
+        <h1 style="color: var(--primary); margin:0;">🎨 云端画廊</h1>
+        <div>
+            <span id="user-display" style="margin-right: 15px; font-weight: bold;"></span>
+            <input type="text" id="search-who" placeholder="搜用户名" style="width: 150px; display:inline-block;">
+            <button onclick="viewGallery()">🔍</button>
+            <button onclick="logout()" id="logout-btn" class="hidden" style="background:#999; margin-left:10px;">退出</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 登录/注册 -->
+        <div id="auth-box" class="card">
+            <h2 id="auth-title">登录</h2>
+            <input type="text" id="username" placeholder="用户名">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="handleAuth()" id="auth-btn">登录</button>
+            <p><a href="#" onclick="toggleMode()">切换 登录/注册</a></p>
+        </div>
+
+        <!-- 上传 (登录后显示) -->
+        <div id="upload-box" class="card hidden">
+            <h3>📤 上传新画作</h3>
+            <input type="text" id="u-title" placeholder="作品标题 (唯一)">
+            <input type="text" id="u-img" placeholder="图片链接 (http://...)">
+            <input type="text" id="u-content" placeholder="介绍一下...">
+            <button onclick="uploadWork()">发布</button>
+        </div>
+
+        <!-- 展示区 -->
+        <h2 id="gallery-name">公共展厅</h2>
+        <div id="gallery-grid" class="gallery-grid"></div>
+    </div>
+
+    <script>
+        const API = "";
+        let isLogin = true;
+        let myName = "";
+
+        // 初始化
+        window.onload = () => {
+            const token = localStorage.getItem("token");
+            if (token) {
+                myName = localStorage.getItem("username");
+                showLoginState();
+            }
+        };
+
+        // --- 1. 点击放大功能 ---
+        function openLightbox(src) {
+            const box = document.getElementById('lightbox');
+            const img = document.getElementById('lightbox-img');
+            img.src = src;
+            box.classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.add('hidden');
+        }
+
+        // --- 2. 核心业务 ---
+        async function handleAuth() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const url = isLogin ? "/login" : "/register";
+
+            try {
+                const res = await fetch(API + url, {
+                    method: "POST",
+                    body: JSON.stringify({username: u, password: p})
+                });
+                const data = await res.json();
+                
+                if(res.status === 200) {
+                    if(isLogin) {
+                        localStorage.setItem("token", data.token);
+                        localStorage.setItem("username", u);
+                        myName = u;
+                        showLoginState();
+                    } else {
+                        alert("注册成功，请登录");
+                        toggleMode();
+                    }
+                } else {
+                    alert(data.error);
+                }
+            } catch(e) { alert("网络错误"); }
+        }
+
+        async function uploadWork() {
+            const body = {
+                title: document.getElementById('u-title').value,
+                image: document.getElementById('u-img').value,
+                content: document.getElementById('u-content').value
+            };
+            if(!body.title || !body.image) return alert("写全点！");
+
+            const res = await fetch(API + "/my/upload", {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + localStorage.getItem("token") },
+                body: JSON.stringify(body)
+            });
+            if(res.ok) {
+                alert("上传成功");
+                viewGallery(myName);
+            } else {
+                alert("上传失败");
+            }
+        }
+
+        // --- 修复后的删除功能 ---
+        async function deleteWork(title) {
+            if(!confirm("确定要删掉《" + title + "》吗？")) return;
+
+            try {
+                // 这里的 URL 必须和 main.go 里的路由一致 (/my/delect)
+                const res = await fetch(API + "/my/delect", {
+                    method: "POST",
+                    headers: { "Authorization": "Bearer " + localStorage.getItem("token") },
+                    // 这里传 JSON，对应 api.go 里的 ShouldBindJSON
+                    body: JSON.stringify({ title: title }) 
+                });
+
+                const data = await res.json();
+                if(res.status === 200) {
+                    alert("已删除");
+                    viewGallery(myName); // 刷新列表
+                } else {
+                    alert(data.error || "删除失败");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("网络连接错误，请检查后端是否报错");
+            }
+        }
+
+        async function viewGallery(who) {
+            const target = who || document.getElementById('search-who').value;
+            if(!target) return;
+
+            const res = await fetch(API + "/gallery/" + target);
+            const data = await res.json();
+            
+            document.getElementById('gallery-name').innerText = target + " 的展厅";
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = "";
+
+            if(data.works) {
+                data.works.forEach(w => {
+                    const isMine = (myName === target);
+                    // 注意 img 标签里的 onclick="openLightbox(...)"
+                    const html = `
+                        <div class="art-item">
+                            <img src="${w.image}" class="art-img" onclick="openLightbox(this.src)" title="点击放大">
+                            <div class="art-info">
+                                <div class="art-title">${w.title}</div>
+                                <div class="art-desc">${w.content}</div>
+                                ${isMine ? `<button class="danger" onclick="deleteWork('${w.title}')">删除</button>` : ""}
+                            </div>
+                        </div>
+                    `;
+                    grid.innerHTML += html;
+                });
+            } else {
+                grid.innerHTML = "<p>还没作品呢</p>";
+            }
+        }
+
+        // --- 辅助功能 ---
+        function toggleMode() {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').innerText = isLogin ? "登录" : "注册";
+            document.getElementById('auth-btn').innerText = isLogin ? "登录" : "注册";
+        }
+        function showLoginState() {
+            document.getElementById('auth-box').classList.add('hidden');
+            document.getElementById('upload-box').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            document.getElementById('user-display').innerText = "Hi, " + myName;
+            viewGallery(myName);
+        }
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+    </script>
+</body>
+</html>
