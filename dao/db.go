@@ -103,11 +103,10 @@ func DelectPaint(username string, workname string) bool {
 // 添加评论
 func AddComment(username string, workname string, comment model.Comment) bool {
 	paintMu.Lock()
-	defer paintMu.Unlock()
 	for num := range WorksMap[username] {
 		if WorksMap[username][num].Title == workname {
 			WorksMap[username][num].Comments = append(WorksMap[username][num].Comments, comment)
-			WorksMap[username] = WorksMap[username]
+			paintMu.Unlock()
 			Save()
 			return true
 		}

@@ -30,8 +30,9 @@ func main() {
 	/*！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！*/
 	authGroup.Use(middleware.AuthMiddleware()) // 安排保安
 	{
-		authGroup.POST("/upload", api.UploadPaint) //发布作品
-		authGroup.POST("/delect", api.Delect)      //删除作品
+		authGroup.POST("/upload", api.UploadPaint)  //发布作品
+		authGroup.POST("/delect", api.Delect)       //删除作品
+		authGroup.POST("/comment", api.PostComment) //评论作品
 	}
 	/*！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！*/
 	// 4. 开业！默认监听 0.0.0.0:8080
