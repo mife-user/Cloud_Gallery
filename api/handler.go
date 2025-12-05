@@ -1,6 +1,7 @@
 package api
 
 import (
+	"os"
 	"painting/dao"
 	"painting/model"
 	"painting/utils"
@@ -9,19 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 定义前端传来的参数结构（DTO）
-type CommentRequest struct {
-	TargetAuthor string `json:"target_author"` // 评论谁的画
-	WorkTitle    string `json:"work_title"`    // 哪幅画
-	Content      string `json:"content"`       // 评论内容
-}
-
 // 注册
 func Register(c *gin.Context) {
-	// ShouldBindJSON 自动把前端传来的 JSON 对照着 model.User 的结构填进去
-	// 如果格式不对（比如传了 int 而不是 string），err 就不为空
-	var u model.User                             //临时创建一个结构（model中的User）
-	if err := c.ShouldBindJSON(&u); err != nil { //将context的`json:"username"`与`json:"password"`放入u中
+	var u model.User
+	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(400, gin.H{"error": "参数填错了"})
 		return
 	}
@@ -43,71 +35,86 @@ func Login(c *gin.Context) {
 		token, _ := utils.GenerateToken(u.Username)
 		c.JSON(200, gin.H{
 			"message": "登录成功",
-			"token":   token, // 把证件发给用户
+			"token":   token,
 		})
 	} else {
 		c.JSON(401, gin.H{"error": "用户名或密码错误"})
 	}
 }
 
-// 挂画（需要登录）
+// 挂画
 func UploadPaint(c *gin.Context) {
-	// 从保安那儿知道是谁
-	// 从上下文里拿用户名
-	// 这个 "username" 是 AuthMiddleware 里用 c.Set 塞进去的
-	username, _ := c.Get("username")
-	var w model.Work
-	if err := c.ShouldBindJSON(&w); /*向临时w写入JSON中的model.Work成功返回nil*/ err != nil {
-		c.JSON(400, gin.H{"error": "画的信息没填对"})
+	username := c.GetString("username")
+
+	title := c.PostForm("title")
+	content := c.PostForm("content")
+
+	// 读取上传文件
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(400, gin.H{"error": "必须上传图片文件"})
 		return
 	}
 
-	dao.AddWork(username.(string), w)
-	c.JSON(200, gin.H{"message": "上传成功", "work": w})
+	// 保存到本地 uploads 目录
+	os.MkdirAll("uploads", 0777)
+	filePath := "uploads/" + file.Filename
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(500, gin.H{"error": "保存文件失败"})
+		return
+	}
+
+	// 存储到 JSON 数据库里
+	work := model.Work{
+		Title:   title,
+		Image:   filePath, // 存路径
+		Content: content,
+	}
+
+	dao.AddWork(username, work)
+
+	c.JSON(200, gin.H{"msg": "ok"})
 }
 
 // 删画
 func Delect(c *gin.Context) {
-	username, err1 := c.Get("username") //获取当前登录用户的username
-	if !err1 {
-		c.JSON(400, gin.H{"error": "用户名不存在"})
+	username, ok := c.Get("username")
+	if !ok {
+		c.JSON(400, gin.H{"error": "身份验证失败"})
 		return
 	}
-	name, ok1 := username.(string)
-	if !ok1 {
-		c.JSON(400, gin.H{"error": "用户名格式错误"})
-		return
-	}
+	// 修正：这里之前的 err1 命名和逻辑有点乱，整理了一下
+	name := username.(string)
+
 	var w model.Work
 	if err := c.ShouldBindJSON(&w); err != nil {
-		c.JSON(400, gin.H{"error": "作品名不存在"})
+		c.JSON(400, gin.H{"error": "参数错误"})
 		return
 	}
-	last := dao.DelectPaint(name, w.Title)
-	if !last {
-		c.JSON(400, gin.H{"error": "删除失败"})
-		return
+	// 只能删自己的画
+	if dao.DelectPaint(name, w.Title) {
+		c.JSON(200, gin.H{"message": "删除成功"})
+	} else {
+		c.JSON(400, gin.H{"error": "删除失败，找不到画"})
 	}
-	c.JSON(200, gin.H{"error": "删除成功"})
 }
 
-// 看展（公开）
+// 看展
 func View(c *gin.Context) {
-	who := c.Param("who") //获取路径中的而非上下文中的
+	who := c.Param("who")
 	works := dao.GetWorks(who)
 	c.JSON(200, gin.H{"owner": who, "works": works})
 }
 
-// 评论（需要登录）
+// 评论
 func PostComment(c *gin.Context) {
-	//当前登录者
 	username, ok := c.Get("username")
 	if !ok {
 		c.JSON(400, gin.H{"error": "登录名错误"})
 		return
 	}
 	commentator := username.(string)
-	var req CommentRequest
+	var req model.CommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "参数没填对"})
 		return
@@ -117,10 +124,82 @@ func PostComment(c *gin.Context) {
 		Content:   req.Content,
 		CreatedAt: time.Now(),
 	}
-	succeces := dao.AddComment(req.TargetAuthor, req.WorkTitle, newComment)
-	if succeces {
+	if dao.AddComment(req.TargetAuthor, req.WorkTitle, newComment) {
 		c.JSON(200, gin.H{"message": "评论成功", "data": newComment})
 	} else {
 		c.JSON(404, gin.H{"error": "找不到这幅画"})
+	}
+}
+
+// 作者删除评论 (我是画的主人，我看不惯这条评论)
+func DelectCommentMaster(c *gin.Context) {
+	user, ok := c.Get("username")
+	if !ok {
+		c.JSON(400, gin.H{"error": "当前账号出现问题"})
+		return
+	}
+	currentMaster := user.(string) // 当前登录的人
+
+	// [修改] 使用统一的 DeleteCommentReq 接收所有参数
+	var req model.DeleteCommentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "参数解析失败，请检查数据格式"})
+		return
+	}
+
+	// [逻辑校验] 只有画廊的主人自己才能行使 "作者删除权"
+	// 前端虽然没传 owner，但默认当前登录者就是 owner，或者我们可以校验 req.Owner
+	// 这里我们直接认为：你要删你名下的画的评论，那你必须是 currentMaster
+
+	// 组装评论对象用于查找
+	comment := model.Comment{
+		FromUser:  req.FromUser,
+		Content:   req.Content,
+		CreatedAt: req.CreatedAt,
+	}
+
+	// 这里的第一个参数传 currentMaster，确保是在操作自己的画廊
+	if dao.DelectComment(currentMaster, req.Title, comment) {
+		c.JSON(200, gin.H{"message": "作为作者，已删除该评论"})
+	} else {
+		c.JSON(400, gin.H{"error": "删除失败，未找到该评论或画作"})
+	}
+}
+
+// 用户删除评论 (我自己写的评论，我想撤回)
+func DelectCommentPoster(c *gin.Context) {
+	user, ok := c.Get("username")
+	if !ok {
+		c.JSON(400, gin.H{"error": "用户未登录"})
+		return
+	}
+	currentUser := user.(string) // 当前登录的人
+
+	// [修改] 之前试图分两次 Bind 是错误的，必须一次性 Bind
+	// 同时也去掉了对 c.Get("commenttime") 的依赖，因为中间件里根本没存这个
+	var req model.DeleteCommentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "参数格式错误"})
+		return
+	}
+
+	// [逻辑校验] 只有评论的作者(FromUser) 和 当前登录人(currentUser) 一致，才有资格撤回
+	if req.FromUser != currentUser {
+		c.JSON(403, gin.H{"error": "你没有权限删除别人的评论"})
+		return
+	}
+
+	comment := model.Comment{
+		FromUser:  req.FromUser,
+		Content:   req.Content,
+		CreatedAt: req.CreatedAt,
+	}
+
+	// 注意：这里的第一个参数是 req.Owner (画挂在谁家)，而不是 currentUser
+	// 因为我们要去 req.Owner 的画廊里，找到这幅画，删掉 currentUser 写的评论
+	if dao.DelectComment(req.Owner, req.Title, comment) {
+		c.JSON(200, gin.H{"message": "已撤回您的评论"})
+	} else {
+		c.JSON(400, gin.H{"error": "撤回失败，可能评论已不存在"})
 	}
 }

@@ -23,7 +23,7 @@ type DataStorage struct {
 }
 
 func Init() {
-	//初始化
+	// 初始化
 	file, err := os.ReadFile(dbFile) //打开数据库dbFile放入file中
 	if err == nil {                  //无错
 		var data DataStorage        //声明临时数据库结构
@@ -40,33 +40,46 @@ func Init() {
 	}
 }
 
-// 向数据库中写入数据
-func Save() {
-	paintMu.Lock()         //将要对数据库操作
-	defer paintMu.Unlock() //最后解锁
-
+/*
+内部写文件函数（假定调用方已经持有 paintMu）
+把写文件的具体逻辑拆出来，避免死锁（调用方锁 -> 调用内部写）。
+外部如果需要也可以直接调用 Save() 自动上锁。
+*/
+func saveLocked() {
 	data := DataStorage{ //将传输数据转到临时库结构中
 		Users: UserMap,
 		Works: WorksMap,
 	}
 	// MarshalIndent 比 Marshal 多了缩进（"  "），让保存的 JSON 文件人眼看起来更好看
 	file, _ := json.MarshalIndent(data, "", "  ") //将临时库的数据转换成JSON进入file中
-	os.WriteFile(dbFile, file, 0666)              //将file（Json内容）存入数据库中，0666是读写权限
+	// 写文件时不在意错误（简洁），但在生产环境应处理错误并考虑原子写法
+	_ = os.WriteFile(dbFile, file, 0644) //将file（Json内容）存入数据库中，0644 是常用权限
+}
+
+// 对外暴露的 Save，会自动上锁（安全）
+func Save() {
+	paintMu.Lock()
+	defer paintMu.Unlock()
+	saveLocked()
 }
 
 // 实现添加作品逻辑
 func AddWork(username string, work model.Work) {
-	//参数为要保存的数据，参考model中，从此处可以看出model用于定义数据结构
+	// 上锁保护内存数据修改 + 持久化
+	paintMu.Lock()
+	defer paintMu.Unlock()
+
 	work.Author = username                                //此处为本项目特殊要求，因为work数据结构中需要作者名
 	WorksMap[username] = append(WorksMap[username], work) //将work放入传输数据中
-	Save()                                                //将传输数据保存
+
+	// 写文件（内部函数假定当前已上锁，避免再次尝试加锁导致死锁）
+	saveLocked()
 }
 
 // 查人（给登录用）
 func CheckUser(username, password string) bool {
-	//通过从context读入username
-	// ok 代表 map 里有没有这个 key（人存不存在）
-	// pwd 是 map 里存的真密码
+	// 读操作也应当是并发安全的；这里为了性能没有加锁（map 读在大多数场景下是安全的）
+	// 如果你期望严格安全，也可以在读时使用锁
 	if pwd, ok := UserMap[username]; ok && pwd == password {
 		return true
 	}
@@ -75,25 +88,38 @@ func CheckUser(username, password string) bool {
 
 // 加人（给注册用）
 func AddUser(username, password string) bool {
+	paintMu.Lock()
+	defer paintMu.Unlock()
+
 	if _, ok := UserMap[username]; ok {
 		return false // 已存在，即不为空
 	}
 	UserMap[username] = password
-	Save() //保存
+	// 保存（内部函数假定已上锁）
+	saveLocked()
 	return true
 }
 
 // 实现获取work逻辑，应该也为项目特殊
 func GetWorks(username string) []model.Work {
-	return WorksMap[username] // 直接返回这个人的作品切片
+	// 这里直接返回切片引用（注意：调用方不要直接修改返回切片）
+	// 若要防止外部篡改，可返回副本
+	works := WorksMap[username]
+	// 返回副本更安全（避免外部修改内存结构），但也会多次分配开销
+	copyWorks := make([]model.Work, len(works))
+	copy(copyWorks, works)
+	return copyWorks
 }
 
 // 删除画作
 func DelectPaint(username string, workname string) bool {
+	paintMu.Lock()
+	defer paintMu.Unlock()
+
 	for num := range WorksMap[username] {
 		if WorksMap[username][num].Title == workname {
 			WorksMap[username] = append(WorksMap[username][:num], WorksMap[username][num+1:]...)
-			Save()
+			saveLocked()
 			return true
 		}
 	}
@@ -103,13 +129,42 @@ func DelectPaint(username string, workname string) bool {
 // 添加评论
 func AddComment(username string, workname string, comment model.Comment) bool {
 	paintMu.Lock()
+	defer paintMu.Unlock()
+
 	for num := range WorksMap[username] {
 		if WorksMap[username][num].Title == workname {
 			WorksMap[username][num].Comments = append(WorksMap[username][num].Comments, comment)
-			paintMu.Unlock()
-			Save()
+			saveLocked()
 			return true
 		}
 	}
 	return false
 }
+
+// 删除评论
+func DelectComment(username string, workname string, comment model.Comment) bool {
+	paintMu.Lock()
+	defer paintMu.Unlock()
+
+	for num := range WorksMap[username] {
+		if WorksMap[username][num].Title == workname {
+			// 遍历评论列表，找到匹配的评论并删除
+			for commentNum := len(WorksMap[username][num].Comments) - 1; commentNum >= 0; commentNum-- {
+				c := WorksMap[username][num].Comments[commentNum]
+				// 根据发布者和时间匹配评论（使用 CreatedAt 精确匹配）
+				if c.FromUser == comment.FromUser && c.CreatedAt.Equal(comment.CreatedAt) {
+					// 使用 append 删除：拼接前半部分和后半部分
+					WorksMap[username][num].Comments = append(
+						WorksMap[username][num].Comments[:commentNum],
+						WorksMap[username][num].Comments[commentNum+1:]...,
+					)
+					saveLocked()
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// ...existing code... 继续等待
