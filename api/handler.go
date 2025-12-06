@@ -1,10 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"os"
 	"painting/dao"
 	"painting/model"
 	"painting/utils"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -43,36 +45,40 @@ func Login(c *gin.Context) {
 }
 
 // 挂画
+// 在UploadPaint函数中修改图片保存逻辑
 func UploadPaint(c *gin.Context) {
 	username := c.GetString("username")
-
 	title := c.PostForm("title")
 	content := c.PostForm("content")
 
-	// 读取上传文件
 	file, err := c.FormFile("image")
 	if err != nil {
 		c.JSON(400, gin.H{"error": "必须上传图片文件"})
 		return
 	}
 
+	// 创建唯一文件名避免冲突
+	ext := filepath.Ext(file.Filename)
+	uniqueName := fmt.Sprintf("%s_%d%s", username, time.Now().UnixNano(), ext)
+
 	// 保存到本地 uploads 目录
 	os.MkdirAll("uploads", 0777)
-	filePath := "uploads/" + file.Filename
+	filePath := "uploads/" + uniqueName
+
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(500, gin.H{"error": "保存文件失败"})
 		return
 	}
 
-	// 存储到 JSON 数据库里
+	// 存储相对路径，前端通过相对路径访问
+	// 如果是远程服务器，需要配置静态文件服务
 	work := model.Work{
 		Title:   title,
-		Image:   filePath, // 存路径
+		Image:   "/uploads/" + uniqueName, // 使用相对URL路径
 		Content: content,
 	}
 
 	dao.AddWork(username, work)
-
 	c.JSON(200, gin.H{"msg": "ok"})
 }
 

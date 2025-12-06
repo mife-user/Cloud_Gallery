@@ -14,12 +14,9 @@ func main() {
 
 	// 2. 启动 Gin 引擎（默认带了 Logger 和 Recovery 中间件，防崩坏）
 	r := gin.Default()
-	// 告诉 Gin，静态文件就在当前目录下
-	r.LoadHTMLFiles("云上画廊.html")
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(200, "云上画廊.html", nil)
-	})
-
+	r.Static("/uploads", "./uploads")
+	r.StaticFile("/", "./云上画廊.html")
+	r.StaticFile("/index.html", "./云上画廊.html")
 	// 3. 全局中间件：安排外交官（CORS）站在大门口，所有请求都要经过它
 	r.Use(middleware.Cors())
 
