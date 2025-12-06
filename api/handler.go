@@ -71,11 +71,12 @@ func UploadPaint(c *gin.Context) {
 	}
 
 	// 存储相对路径，前端通过相对路径访问
-	// 如果是远程服务器，需要配置静态文件服务
+	// 注意：这里使用相对路径，不要加斜杠开头
 	work := model.Work{
 		Title:   title,
-		Image:   "/uploads/" + uniqueName, // 使用相对URL路径
+		Image:   "/uploads/" + uniqueName,
 		Content: content,
+		Author:  username,
 	}
 
 	dao.AddWork(username, work)
@@ -89,7 +90,6 @@ func Delect(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "身份验证失败"})
 		return
 	}
-	// 修正：这里之前的 err1 命名和逻辑有点乱，整理了一下
 	name := username.(string)
 
 	var w model.Work
@@ -97,6 +97,14 @@ func Delect(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "参数错误"})
 		return
 	}
+
+	// 双重验证：确保只能删自己的画
+	// 这里前端传过来的 w.Author 应该是当前用户的用户名
+	if w.Author != "" && w.Author != name {
+		c.JSON(403, gin.H{"error": "没有权限删除别人的作品"})
+		return
+	}
+
 	// 只能删自己的画
 	if dao.DelectPaint(name, w.Title) {
 		c.JSON(200, gin.H{"message": "删除成功"})

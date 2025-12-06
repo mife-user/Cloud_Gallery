@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"painting/model"
+	"strings"
 	"sync"
 )
 
@@ -65,8 +66,7 @@ func Save() {
 
 // 实现添加作品逻辑
 func AddWork(username string, work model.Work) {
-	// 上锁保护内存数据修改 + 持久化
-	paintMu.Lock()
+	paintMu.Lock() // 上锁保护内存数据修改 + 持久化
 	defer paintMu.Unlock()
 
 	work.Author = username                                //此处为本项目特殊要求，因为work数据结构中需要作者名
@@ -83,6 +83,7 @@ func CheckUser(username, password string) bool {
 	if pwd, ok := UserMap[username]; ok && pwd == password {
 		return true
 	}
+
 	return false
 }
 
@@ -116,13 +117,42 @@ func DelectPaint(username string, workname string) bool {
 	paintMu.Lock()
 	defer paintMu.Unlock()
 
-	for num := range WorksMap[username] {
-		if WorksMap[username][num].Title == workname {
-			WorksMap[username] = append(WorksMap[username][:num], WorksMap[username][num+1:]...)
-			saveLocked()
-			return true
+	// 检查用户是否存在
+	works, exists := WorksMap[username]
+	if !exists {
+		return false
+	}
+
+	// 创建一个新的切片来存储保留的作品
+	newWorks := make([]model.Work, 0, len(works))
+	found := false
+
+	// 遍历所有作品
+	for _, work := range works {
+		if work.Title == workname && !found {
+			// 找到要删除的作品，跳过它
+			found = true
+			// 删除本地图片文件 - 简化的版本
+			if work.Image != "" {
+				// 先移除开头的斜杠，然后检查是否为 uploads/ 路径
+				filePath := strings.TrimPrefix(work.Image, "/")
+				if strings.HasPrefix(filePath, "uploads/") {
+					os.Remove(filePath)
+				}
+			}
+		} else {
+			// 保留其他作品
+			newWorks = append(newWorks, work)
 		}
 	}
+
+	// 如果找到了要删除的作品
+	if found {
+		WorksMap[username] = newWorks
+		saveLocked()
+		return true
+	}
+
 	return false
 }
 
@@ -167,4 +197,5 @@ func DelectComment(username string, workname string, comment model.Comment) bool
 	return false
 }
 
+//删除画作
 // ...existing code... 继续等待
