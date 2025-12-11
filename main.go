@@ -2,6 +2,7 @@ package main
 
 import (
 	"painting/api"
+	"painting/dao"
 	"painting/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,11 @@ func main() {
 	// // 1. 仓库管理员先上班，准备好账本
 	// dao.Init()
 	// 2. 启动 Gin 引擎（默认带了 Logger 和 Recovery 中间件，防崩坏）
+	var ok bool
+	api.Temp, ok = dao.Init()
+	if !ok {
+		return
+	}
 	r := gin.Default()
 
 	// 静态文件服务 - 正确配置

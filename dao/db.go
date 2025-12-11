@@ -1,4 +1,4 @@
-package dao //可以看出dao包用于数据库的处理
+package dao
 
 import (
 	"fmt"
@@ -10,41 +10,10 @@ import (
 	"gorm.io/gorm"
 )
 
-/*
-paintMu 是一把锁。
-因为 Go 的 map 在多个人同时写入时会报错（并发冲突），
-所以每次写文件前要先锁住，写完再开锁
-*/
-// var paintMu sync.Mutex
-// var UserMap = map[string]string{}
-// var WorksMap = map[string][]model.Work{}
-// var dbFile = "database.json"
-
-type DataStorage struct {
-	Users map[string]string       `json:"users"`
-	Works map[string][]model.Work `json:"works"`
-}
 type Database struct {
 	DB *gorm.DB
 }
 
-//	func Init() {
-//		// 初始化
-//		file, err := os.ReadFile(dbFile) //打开数据库dbFile放入file中
-//		if err == nil {                  //无错
-//			var data DataStorage        //声明临时数据库结构
-//			json.Unmarshal(file, &data) //将file（JSON）转换到data（临时数据库）
-//			UserMap = data.Users        //将临时数据库的数据存入传输数据中
-//			WorksMap = data.Works       //同上
-//		}
-//		// 防止空指针
-//		if UserMap == nil { //即数据库中无内容则初始化
-//			UserMap = make(map[string]string)
-//		}
-//		if WorksMap == nil {
-//			WorksMap = make(map[string][]model.Work)
-//		}
-//	}
 func Init() (*Database, bool) {
 	// 从环境变量读取，默认 localhost（本地开发）或 mysql（Docker 环境）
 	host := os.Getenv("DB_HOST")
@@ -66,39 +35,8 @@ func Init() (*Database, bool) {
 	return DB, true
 }
 
-/*
-内部写文件函数（假定调用方已经持有 paintMu）
-把写文件的具体逻辑拆出来，避免死锁（调用方锁 -> 调用内部写）。
-外部如果需要也可以直接调用 Save() 自动上锁。
-*/
-// func saveLocked() {
-// 	data := DataStorage{ //将传输数据转到临时库结构中
-// 		Users: UserMap,
-// 		Works: WorksMap,
-// 	}
-// 	// MarshalIndent 比 Marshal 多了缩进（"  "），让保存的 JSON 文件人眼看起来更好看
-// 	file, _ := json.MarshalIndent(data, "", "  ") //将临时库的数据转换成JSON进入file中
-// 	// 写文件时不在意错误（简洁），但在生产环境应处理错误并考虑原子写法
-// 	_ = os.WriteFile(dbFile, file, 0644) //将file（Json内容）存入数据库中，0644 是常用权限
-// }
-
-// // 对外暴露的 Save，会自动上锁（安全）
-// func Save() {
-// 	paintMu.Lock()
-// 	defer paintMu.Unlock()
-// 	saveLocked()
-// }
-
 // 实现添加作品逻辑
 func (d *Database) AddWork(username string, work *model.Work) bool {
-	// paintMu.Lock() // 上锁保护内存数据修改 + 持久化
-	// defer paintMu.Unlock()
-
-	// work.Author = username                                //此处为本项目特殊要求，因为work数据结构中需要作者名
-	// WorksMap[username] = append(WorksMap[username], work) //将work放入传输数据中
-
-	// 写文件（内部函数假定当前已上锁，避免再次尝试加锁导致死锁）
-	// saveLocked()
 	user := model.User{
 		Username: username,
 		Password: "",

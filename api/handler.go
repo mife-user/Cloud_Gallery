@@ -12,19 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var Temp *dao.Database
+
 // 注册
 func Register(c *gin.Context) {
 	var u model.User
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(400, gin.H{"error": "参数填错了"})
 		return
 	}
-	if ok := temp.AddUser(u.Username, u.Password); ok {
+	if ok := Temp.AddUser(u.Username, u.Password); ok {
 		c.JSON(200, gin.H{"message": "注册成功！"})
 	} else {
 		c.JSON(400, gin.H{"error": "用户名已存在"})
@@ -34,16 +36,16 @@ func Register(c *gin.Context) {
 // 登录
 func Login(c *gin.Context) {
 	var u model.User
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(400, gin.H{"error": "参数填错了"})
 		return
 	}
-	if ok := temp.CheckUser(u.Username, u.Password); ok {
+	if ok := Temp.CheckUser(u.Username, u.Password); ok {
 		token, _ := utils.GenerateToken(u.Username)
 		c.JSON(200, gin.H{
 			"message": "登录成功",
@@ -57,15 +59,24 @@ func Login(c *gin.Context) {
 // 挂画
 // 在UploadPaint函数中修改图片保存逻辑
 func UploadPaint(c *gin.Context) {
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
+	// username := c.GetString("username")
+	// title := c.PostForm("title")
+	// content := c.PostForm("content")
+	var w model.Work
+	if err := c.ShouldBindJSON(&w); err != nil {
+		c.JSON(400, gin.H{"error": "参数错误"})
 		return
 	}
-	username := c.GetString("username")
-	title := c.PostForm("title")
-	content := c.PostForm("content")
-
+	var u model.User
+	if err := c.ShouldBindJSON(&u); err != nil {
+		c.JSON(400, gin.H{"error": "参数填错了"})
+		return
+	}
 	file, err := c.FormFile("image")
 	if err != nil {
 		c.JSON(400, gin.H{"error": "必须上传图片文件"})
@@ -74,7 +85,7 @@ func UploadPaint(c *gin.Context) {
 
 	// 创建唯一文件名避免冲突
 	ext := filepath.Ext(file.Filename)
-	uniqueName := fmt.Sprintf("%s_%d%s", username, time.Now().UnixNano(), ext)
+	uniqueName := fmt.Sprintf("%s_%d%s", u.Username, time.Now().UnixNano(), ext)
 
 	// 保存到本地 uploads 目录
 	os.MkdirAll("uploads", 0777)
@@ -88,22 +99,22 @@ func UploadPaint(c *gin.Context) {
 	// 存储相对路径，前端通过相对路径访问
 	// 注意：这里使用相对路径，不要加斜杠开头
 	work := model.Work{
-		Title:   title,
+		Title:   w.Title,
 		Image:   "/uploads/" + uniqueName,
-		Content: content,
-		Author:  username,
+		Content: w.Content,
+		Author:  u.Username,
 	}
-	temp.AddWork(username, &work)
+	Temp.AddWork(u.Username, &work)
 	c.JSON(200, gin.H{"msg": "ok"})
 }
 
 // 删画
 func Delect(c *gin.Context) {
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	username, ok := c.Get("username")
 	if !ok {
 		c.JSON(400, gin.H{"error": "身份验证失败"})
@@ -125,7 +136,7 @@ func Delect(c *gin.Context) {
 	}
 
 	// 只能删自己的画
-	if temp.DelectPaint(name, w.Title) {
+	if Temp.DelectPaint(name, w.Title) {
 		c.JSON(200, gin.H{"message": "删除成功"})
 	} else {
 		c.JSON(400, gin.H{"error": "删除失败，找不到画"})
@@ -134,23 +145,23 @@ func Delect(c *gin.Context) {
 
 // 看展
 func View(c *gin.Context) {
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	who := c.Param("who")
-	works := temp.GetWorks(who)
+	works := Temp.GetWorks(who)
 	c.JSON(200, gin.H{"owner": who, "works": works})
 }
 
 // 评论
 func PostComment(c *gin.Context) {
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	username, ok := c.Get("username")
 	if !ok {
 		c.JSON(400, gin.H{"error": "登录名错误"})
@@ -167,7 +178,7 @@ func PostComment(c *gin.Context) {
 		Content:   req.Content,
 		CreatedAt: time.Now(),
 	}
-	if temp.AddComment(req.TargetAuthor, req.WorkTitle, newComment) {
+	if Temp.AddComment(req.TargetAuthor, req.WorkTitle, newComment) {
 		c.JSON(200, gin.H{"message": "评论成功", "data": newComment})
 	} else {
 		c.JSON(404, gin.H{"error": "找不到这幅画"})
@@ -176,11 +187,11 @@ func PostComment(c *gin.Context) {
 
 // 作者删除评论 (我是画的主人，我看不惯这条评论)
 func DelectCommentMaster(c *gin.Context) {
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	user, ok := c.Get("username")
 	if !ok {
 		c.JSON(400, gin.H{"error": "当前账号出现问题"})
@@ -194,20 +205,12 @@ func DelectCommentMaster(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "参数解析失败，请检查数据格式"})
 		return
 	}
-
-	// [逻辑校验] 只有画廊的主人自己才能行使 "作者删除权"
-	// 前端虽然没传 owner，但默认当前登录者就是 owner，或者我们可以校验 req.Owner
-	// 这里我们直接认为：你要删你名下的画的评论，那你必须是 currentMaster
-
-	// 组装评论对象用于查找
 	comment := model.Comment{
 		FromUser:  req.FromUser,
 		Content:   req.Content,
 		CreatedAt: req.CreatedAt,
 	}
-
-	// 这里的第一个参数传 currentMaster，确保是在操作自己的画廊
-	if temp.DelectComment(currentMaster, req.Title, comment) {
+	if Temp.DelectComment(currentMaster, req.Title, comment) {
 		c.JSON(200, gin.H{"message": "作为作者，已删除该评论"})
 	} else {
 		c.JSON(400, gin.H{"error": "删除失败，未找到该评论或画作"})
@@ -216,11 +219,11 @@ func DelectCommentMaster(c *gin.Context) {
 
 // 用户删除评论 (我自己写的评论，我想撤回)
 func DelectCommentPoster(c *gin.Context) {
-	temp, ok := dao.Init()
-	if !ok {
-		c.JSON(400, gin.H{"error": "数据库错误"})
-		return
-	}
+	// temp, ok := dao.Init()
+	// if !ok {
+	// 	c.JSON(400, gin.H{"error": "数据库错误"})
+	// 	return
+	// }
 	user, ok := c.Get("username")
 	if !ok {
 		c.JSON(400, gin.H{"error": "用户未登录"})
@@ -250,7 +253,7 @@ func DelectCommentPoster(c *gin.Context) {
 
 	// 注意：这里的第一个参数是 req.Owner (画挂在谁家)，而不是 currentUser
 	// 因为我们要去 req.Owner 的画廊里，找到这幅画，删掉 currentUser 写的评论
-	if temp.DelectComment(req.Owner, req.Title, comment) {
+	if Temp.DelectComment(req.Owner, req.Title, comment) {
 		c.JSON(200, gin.H{"message": "已撤回您的评论"})
 	} else {
 		c.JSON(400, gin.H{"error": "撤回失败，可能评论已不存在"})
