@@ -1,27 +1,37 @@
 package model
 
-import "time"
+import (
+	"time"
 
-//用户
+	"gorm.io/gorm"
+)
+
+// 用户
 type User struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	gorm.Model
+	Username string `gorm:"column:username;type:varchar(100)" json:"username"`
+	Password string `gorm:"column:password;type:varchar(255)" json:"password"`
+	Work     []Work `gorm:"foreignKey:UserID"`
 }
 
-//作品
+// 作品
 type Work struct {
-	Title    string    `json:"title"`    //作品名
-	Image    string    `json:"image"`    //链接
-	Content  string    `json:"content"`  //文字介绍
-	Author   string    `json:"author"`   //作者名
-	Comments []Comment `json:"comments"` //评论
+	gorm.Model
+	UserID   uint      `gorm:"column:user_id"`
+	Title    string    `gorm:"column:title;type:varchar(255)" json:"title"`
+	Image    string    `gorm:"column:image;type:varchar(500)" json:"image"`
+	Content  string    `gorm:"column:content;type:longtext" json:"content"`
+	Author   string    `gorm:"column:author;type:varchar(100)" json:"author"`
+	Comments []Comment `gorm:"foreignKey:WorkID" json:"comments"`
 }
 
-//评论
+// 评论
 type Comment struct {
-	FromUser  string    `json:"from_user"`  //评论者
-	Content   string    `json:"content"`    //评论
-	CreatedAt time.Time `json:"created_at"` //评论时间
+	gorm.Model
+	WorkID    uint      `gorm:"column:work_id"`
+	FromUser  string    `gorm:"column:fromuser;type:varchar(100)" json:"from_user"`
+	Content   string    `gorm:"column:content;type:longtext" json:"content"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // 评论要求（发表评论用）
