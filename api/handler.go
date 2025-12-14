@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"painting/dao"
 	"painting/model"
@@ -13,6 +14,15 @@ import (
 )
 
 var Temp *dao.Database
+
+// 关闭数据库
+func CloseSQL() {
+	if err := Temp.Close(); err != nil {
+		fmt.Print(err)
+		return
+	}
+
+}
 
 // 注册
 func Register(c *gin.Context) {
@@ -59,53 +69,47 @@ func Login(c *gin.Context) {
 // 挂画
 // 在UploadPaint函数中修改图片保存逻辑
 func UploadPaint(c *gin.Context) {
-	// temp, ok := dao.Init()
-	// if !ok {
-	// 	c.JSON(400, gin.H{"error": "数据库错误"})
-	// 	return
-	// }
-	// username := c.GetString("username")
-	// title := c.PostForm("title")
-	// content := c.PostForm("content")
-	var w model.Work
-	if err := c.ShouldBindJSON(&w); err != nil {
-		c.JSON(400, gin.H{"error": "参数错误"})
+	usernameI, ok := c.Get("username")
+	if !ok {
+		c.JSON(401, gin.H{"error": "未认证"})
 		return
 	}
-	var u model.User
-	if err := c.ShouldBindJSON(&u); err != nil {
-		c.JSON(400, gin.H{"error": "参数填错了"})
+	username, _ := usernameI.(string)
+	var work model.Work
+	title := c.PostForm("title")
+	if title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title 必填"})
 		return
 	}
+	work.Content = c.PostForm("content")
+	work.Author = c.PostForm("author")
 	file, err := c.FormFile("image")
 	if err != nil {
 		c.JSON(400, gin.H{"error": "必须上传图片文件"})
 		return
 	}
 
-	// 创建唯一文件名避免冲突
 	ext := filepath.Ext(file.Filename)
-	uniqueName := fmt.Sprintf("%s_%d%s", u.Username, time.Now().UnixNano(), ext)
-
-	// 保存到本地 uploads 目录
-	os.MkdirAll("uploads", 0777)
-	filePath := "uploads/" + uniqueName
-
+	uniqueName := fmt.Sprintf("%s_%d%s", username, time.Now().UnixNano(), ext)
+	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+		c.JSON(500, gin.H{"error": "创建目录失败"})
+		return
+	}
+	filePath := filepath.Join("uploads", uniqueName)
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(500, gin.H{"error": "保存文件失败"})
 		return
 	}
 
-	// 存储相对路径，前端通过相对路径访问
-	// 注意：这里使用相对路径，不要加斜杠开头
-	work := model.Work{
-		Title:   w.Title,
-		Image:   "/uploads/" + uniqueName,
-		Content: w.Content,
-		Author:  u.Username,
+	// 5. 写入 DB
+	work.Image = "/uploads/" + uniqueName
+	if ok := Temp.AddWork(username, &work); !ok {
+		c.JSON(500, gin.H{"error": "添加作品到数据库失败"})
+		return
 	}
-	Temp.AddWork(u.Username, &work)
-	c.JSON(200, gin.H{"msg": "ok"})
+
+	c.JSON(200, gin.H{"message": "ok"})
+
 }
 
 // 删画
@@ -258,4 +262,34 @@ func DelectCommentPoster(c *gin.Context) {
 	} else {
 		c.JSON(400, gin.H{"error": "撤回失败，可能评论已不存在"})
 	}
+}
+
+// 添加头像
+func AddUserHand(c *gin.Context) {
+	var user model.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(400, gin.H{"error": "未登录"})
+		return
+	}
+	if user.Username == "" {
+		c.JSON(400, gin.H{"error": "username required"})
+		return
+	}
+	file, err := c.FormFile("userhand")
+	if err != nil {
+		c.JSON(400, gin.H{"error": "file required"})
+		return
+	}
+	// 确保目录存在并保存文件，生成唯一名
+	dstName := fmt.Sprintf("%s_%d_%s", user.Username, time.Now().Unix(), filepath.Base(file.Filename))
+	if err := os.MkdirAll("userhands", os.ModePerm); err != nil {
+		c.JSON(500, gin.H{"error": "创建目录失败"})
+		return
+	}
+	filePath := filepath.Join("userhands", dstName)
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(500, gin.H{"error": "保存文件失败"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "ok", "path": "/userhands/" + dstName})
 }

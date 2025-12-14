@@ -14,6 +14,19 @@ type Database struct {
 	DB *gorm.DB
 }
 
+// 关闭数据库
+func (d *Database) Close() error {
+	sqlDB, err := d.DB.DB()
+	if err != nil {
+		return err
+	}
+	if err := sqlDB.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// 初始化
 func Init() (*Database, bool) {
 	// 从环境变量读取，默认 localhost（本地开发）或 mysql（Docker 环境）
 	host := os.Getenv("DB_HOST")
@@ -25,7 +38,7 @@ func Init() (*Database, bool) {
 		port = "3306"
 	}
 
-	dsn := fmt.Sprintf("root:314159@tcp(%s:%s)/paint?charset=utf8mb4&parseTime=True&loc=Local", host, port)
+	dsn := fmt.Sprintf("root:123456@tcp(%s:%s)/paint?charset=utf8mb4&parseTime=True&loc=Local", host, port)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, false
@@ -37,10 +50,7 @@ func Init() (*Database, bool) {
 
 // 实现添加作品逻辑
 func (d *Database) AddWork(username string, work *model.Work) bool {
-	user := model.User{
-		Username: username,
-		Password: "",
-	}
+	var user model.User
 	if err := d.DB.Where("username = ?", username).First(&user).Error; err != nil {
 		return false
 	}
@@ -234,5 +244,14 @@ func (d *Database) DelectComment(username string, workname string, comment model
 	// }
 }
 
-//删除画作
-// ...existing code... 继续等待
+// 添加头像
+func (d *Database) AddUserHand(user *model.User) bool {
+	var userTemp *model.User
+	if err := d.DB.Where("username = ?", user.Username).First(userTemp).Error; err != nil {
+		return false
+	}
+	if err := d.DB.Model(userTemp).Create(user).Error; err != nil {
+		return false
+	}
+	return true
+}
