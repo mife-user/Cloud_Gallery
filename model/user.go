@@ -37,9 +37,9 @@ type Comment struct {
 
 // 评论要求（发表评论用）
 type CommentRequest struct {
-	TargetAuthor string `json:"target_author"` // 评论谁的画
-	WorkTitle    string `json:"work_title"`    // 哪幅画
-	Content      string `json:"content"`       // 评论内容
+	TargetAuthor string `gorm:"column:target_author;type:varchar(100)" json:"target_author"` // 评论谁的画
+	WorkTitle    string `gorm:"column:work_title;type:varchar(255)" json:"work_title"`       // 哪幅画
+	Content      string `gorm:"column:content;type:longtext" json:"content"`                 // 评论内容
 }
 
 // [新增] 删除评论的专用请求包

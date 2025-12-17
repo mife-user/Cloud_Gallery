@@ -6,12 +6,14 @@ import (
 	"painting/model"
 	"strings"
 
+	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 type Database struct {
 	DB *gorm.DB
+	RE *redis.Client
 }
 
 // 关闭数据库
@@ -44,7 +46,15 @@ func Init() (*Database, bool) {
 		return nil, false
 	}
 	db.AutoMigrate(&model.User{}, &model.Work{}, &model.Comment{})
-	DB := &Database{DB: db}
+	re := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "123456",
+		DB:       0,
+	})
+	if re.Ping(re.Context()).Err() != nil {
+		return nil, false
+	}
+	DB := &Database{DB: db, RE: re}
 	return DB, true
 }
 
@@ -94,18 +104,16 @@ func (d *Database) AddUser(username, password string) bool {
 		Username: username,
 		Password: password,
 	}
-	if err := d.DB.Model(&user).Where("username = ?", username).First(&user); err != nil {
-		// 用户不存在，创建新用户
-		if err := d.DB.Create(&user).Error; err != nil {
-			return false
-		}
-		return true
+
+	if err := d.DB.Create(&user).Error; err != nil {
+		return false
 	}
-	return false
+	return true
+
 }
 
 // 实现获取work逻辑，应该也为项目特殊
-func (d *Database) GetWorks(username string) []model.Work {
+func (d *Database) GetWorks(username string) ([]model.Work, error) {
 	// 这里直接返回切片引用（注意：调用方不要直接修改返回切片）
 	// 若要防止外部篡改，可返回副本
 	// works := WorksMap[username]
@@ -114,16 +122,16 @@ func (d *Database) GetWorks(username string) []model.Work {
 		Password: "",
 	}
 	if err := d.DB.Model(&user).Where("username = ?", username).First(&user).Error; err != nil {
-		return nil
+		return nil, err
 	}
 	var works []model.Work
 	if err := d.DB.Preload("Comments").Where("user_id = ?", user.ID).Find(&works).Error; err != nil {
-		return nil
+		return nil, err
 	}
 	// 返回副本更安全（避免外部修改内存结构），但也会多次分配开销
 	copyWorks := make([]model.Work, len(works))
 	copy(copyWorks, works)
-	return copyWorks
+	return copyWorks, nil
 }
 
 // 删除画作
@@ -187,7 +195,7 @@ func (d *Database) DelectPaint(username string, workname string) bool {
 }
 
 // 添加评论
-func (d *Database) AddComment(username string, workname string, comment model.Comment) bool {
+func (d *Database) AddComment(username string, workname string, comment *model.Comment) bool {
 	var user model.User
 	if err := d.DB.Where("username = ?", username).First(&user).Error; err != nil {
 		return false
@@ -199,16 +207,14 @@ func (d *Database) AddComment(username string, workname string, comment model.Co
 	}
 
 	comment.WorkID = work.ID
-	if err := d.DB.Create(&comment).Error; err != nil {
+	if err := d.DB.Create(comment).Error; err != nil {
 		return false
 	}
 	return true
 }
 
 // 删除评论
-func (d *Database) DelectComment(username string, workname string, comment model.Comment) bool {
-	// paintMu.Lock()
-	// defer paintMu.Unlock()
+func (d *Database) DelectComment(username string, workname string, comment *model.Comment) bool {
 	var user model.User
 	if err := d.DB.Where("username = ?", username).First(&user).Error; err != nil {
 		return false
@@ -217,10 +223,11 @@ func (d *Database) DelectComment(username string, workname string, comment model
 	if err := d.DB.Where("user_id = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
 		return false
 	}
-	if err := d.DB.Where("work_id = ? AND content = ?", work.ID, comment.Content).First(&comment).Error; err != nil {
+	if err := d.DB.Where("work_id = ? AND from_user = ? AND created_at = ?",
+		work.ID, comment.FromUser, comment.CreatedAt).First(comment).Error; err != nil {
 		return false
 	}
-	if err := d.DB.Model(&work).Association("Comments").Delete(&comment); err != nil {
+	if err := d.DB.Model(&work).Association("Comments").Delete(comment); err != nil {
 		return false
 	}
 	return true
@@ -244,13 +251,12 @@ func (d *Database) DelectComment(username string, workname string, comment model
 	// }
 }
 
-// 添加头像
-func (d *Database) AddUserHand(user *model.User) bool {
-	var userTemp *model.User
-	if err := d.DB.Where("username = ?", user.Username).First(userTemp).Error; err != nil {
+func (d *Database) AddHand(user *model.User) bool {
+	var userTemp model.User
+	if err := d.DB.Where("username = ?", user.Username).First(&userTemp).Error; err != nil {
 		return false
 	}
-	if err := d.DB.Model(userTemp).Create(user).Error; err != nil {
+	if err := d.DB.Model(&userTemp).Update("user_hand", user.UserHand).Error; err != nil {
 		return false
 	}
 	return true
