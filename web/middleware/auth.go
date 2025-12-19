@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"painting/utils"
+	"painting/web/utils"
 	"strings"
 
 	"github.com/gin-gonic/gin"

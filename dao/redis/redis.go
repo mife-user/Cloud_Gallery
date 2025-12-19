@@ -1,17 +1,18 @@
-package api
+package redis
 
 import (
 	"fmt"
+	"painting/box"
 	"painting/model"
-	"painting/utils"
+	"painting/web/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // 注册缓存检查
-func register1(c *gin.Context, u *model.User) bool {
-	if err := Temp.RE.HGet(c, u.Username, "username").Err(); err == nil {
+func Register1(c *gin.Context, u *model.User) bool {
+	if err := box.Temp.RE.HGet(c, u.Username, "username").Err(); err == nil {
 		c.JSON(400, gin.H{"error": "用户已存在"})
 		return false
 	}
@@ -19,17 +20,17 @@ func register1(c *gin.Context, u *model.User) bool {
 }
 
 // 注册缓存设置
-func register2(c *gin.Context, u *model.User) {
-	if err := Temp.RE.HSet(c, u.Username, "username", u.Username).Err(); err != nil {
+func Register2(c *gin.Context, u *model.User) {
+	if err := box.Temp.RE.HSet(c, u.Username, "username", u.Username).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return
 	}
-	Temp.RE.Expire(c, u.Username, 2*time.Hour)
+	box.Temp.RE.Expire(c, u.Username, 2*time.Hour)
 }
 
 // 登录缓存检查与处理
-func login1(c *gin.Context, u *model.User) int {
-	userTemp, err := Temp.RE.HMGet(c, u.Username, "username", "password").Result()
+func Login1(c *gin.Context, u *model.User) int {
+	userTemp, err := box.Temp.RE.HMGet(c, u.Username, "username", "password").Result()
 	if err != nil {
 		return 0
 	}
@@ -41,7 +42,7 @@ func login1(c *gin.Context, u *model.User) int {
 	if !ok1 || !ok2 {
 		return 0
 	}
-	if ok := Temp.CheckUser(userName, passWord); ok {
+	if ok := box.Temp.CheckUser(userName, passWord); ok {
 		token, _ := utils.GenerateToken(userName)
 		c.JSON(200, gin.H{
 			"message": "登录成功",
@@ -55,21 +56,21 @@ func login1(c *gin.Context, u *model.User) int {
 }
 
 // 登录缓存设置与处理
-func login2(c *gin.Context, u *model.User) {
-	if err := Temp.RE.HMSet(c, u.Username,
+func Login2(c *gin.Context, u *model.User) {
+	if err := box.Temp.RE.HMSet(c, u.Username,
 		"username", u.Username,
 		"password", u.Password,
 	).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return
 	}
-	Temp.RE.Expire(c, u.Username, 2*time.Hour)
+	box.Temp.RE.Expire(c, u.Username, 2*time.Hour)
 }
 
 // 挂画缓存处理
-func uploadPaint2(c *gin.Context, u *model.Work) {
+func UploadPaint2(c *gin.Context, u *model.Work) {
 	userWork := fmt.Sprintf("%s:%s", u.Author, u.Title)
-	if err := Temp.RE.HMSet(c,
+	if err := box.Temp.RE.HMSet(c,
 		userWork,
 		"title", u.Title,
 		"author", u.Author,
@@ -79,13 +80,13 @@ func uploadPaint2(c *gin.Context, u *model.Work) {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return
 	}
-	Temp.RE.Expire(c, userWork, 2*time.Hour)
+	box.Temp.RE.Expire(c, userWork, 2*time.Hour)
 }
 
 // 删画缓存处理
-func delectPaint2(c *gin.Context, u *model.Work) {
+func DelectPaint2(c *gin.Context, u *model.Work) {
 	userWork := fmt.Sprintf("%s:%s", u.Author, u.Title)
-	if err := Temp.RE.HDel(c,
+	if err := box.Temp.RE.HDel(c,
 		userWork,
 		"title",
 		"author",
@@ -98,13 +99,13 @@ func delectPaint2(c *gin.Context, u *model.Work) {
 }
 
 // 看画缓存检查
-func view1(c *gin.Context, who string) bool {
+func View1(c *gin.Context, who string) bool {
 	pattern := fmt.Sprintf("%s:*", who)
 	var works []model.Work
-	iter := Temp.RE.Scan(c, 0, pattern, 0).Iterator()
+	iter := box.Temp.RE.Scan(c, 0, pattern, 0).Iterator()
 	for iter.Next(c) {
 		workKey := iter.Val()
-		workData, err := Temp.RE.HMGet(c, workKey, "title", "author", "content", "image").Result()
+		workData, err := box.Temp.RE.HMGet(c, workKey, "title", "author", "content", "image").Result()
 		if err != nil {
 			c.JSON(400, gin.H{"error": "redis服务器错误"})
 			return false
@@ -123,10 +124,10 @@ func view1(c *gin.Context, who string) bool {
 		/*--------------------------------------------------------------------------*/
 		patternComment := fmt.Sprintf("%s:%s:*:*:comments", who, title)
 		var comments []model.Comment
-		iterComment := Temp.RE.Scan(c, 0, patternComment, 0).Iterator()
+		iterComment := box.Temp.RE.Scan(c, 0, patternComment, 0).Iterator()
 		for iterComment.Next(c) {
 			commentKey := iterComment.Val()
-			commentData, err := Temp.RE.HMGet(c, commentKey, "from_user", "content", "created_at").Result()
+			commentData, err := box.Temp.RE.HMGet(c, commentKey, "from_user", "content", "created_at").Result()
 			if err != nil {
 				c.JSON(400, gin.H{"error": "redis服务器错误"})
 				return false
@@ -168,10 +169,10 @@ func view1(c *gin.Context, who string) bool {
 }
 
 // 看画缓存处理
-func view2(c *gin.Context, works *[]model.Work) {
+func View2(c *gin.Context, works *[]model.Work) {
 	for _, work := range *works {
 		userWork := fmt.Sprintf("%s:%s", work.Author, work.Title)
-		if err := Temp.RE.HMSet(c,
+		if err := box.Temp.RE.HMSet(c,
 			userWork,
 			"title", work.Title,
 			"author", work.Author,
@@ -186,7 +187,7 @@ func view2(c *gin.Context, works *[]model.Work) {
 			commentKey := fmt.Sprintf("%s:%s:%s:%s:comments",
 				work.Author, work.Title, comment.FromUser, comment.CreatedAt.Format(time.RFC3339))
 
-			if err := Temp.RE.HMSet(c,
+			if err := box.Temp.RE.HMSet(c,
 				commentKey,
 				"from_user", comment.FromUser,
 				"content", comment.Content,
@@ -195,20 +196,20 @@ func view2(c *gin.Context, works *[]model.Work) {
 				c.JSON(400, gin.H{"error": "redis服务器错误"})
 				return
 			}
-			Temp.RE.Expire(c, commentKey, 2*time.Hour)
+			box.Temp.RE.Expire(c, commentKey, 2*time.Hour)
 		}
 
-		Temp.RE.Expire(c, userWork, 2*time.Hour)
+		box.Temp.RE.Expire(c, userWork, 2*time.Hour)
 	}
 }
 
 // 评论缓存处理
-func postComment1(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) bool {
+func PostComment1(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) bool {
 
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments",
 		req.TargetAuthor, req.WorkTitle, newComment.FromUser, newComment.CreatedAt.Format(time.RFC3339))
 
-	if err := Temp.RE.HMSet(c,
+	if err := box.Temp.RE.HMSet(c,
 		workComment,
 		"from_user", newComment.FromUser,
 		"content", newComment.Content,
@@ -217,14 +218,14 @@ func postComment1(c *gin.Context, newComment *model.Comment, req *model.CommentR
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return false
 	}
-	Temp.RE.Expire(c, workComment, 2*time.Hour)
+	box.Temp.RE.Expire(c, workComment, 2*time.Hour)
 	return true
 }
 
 // 作者评论删除缓存处理
-func delectCommentMaster1(c *gin.Context, currentMaster string, req *model.DeleteCommentReq) {
+func DelectCommentMaster1(c *gin.Context, currentMaster string, req *model.DeleteCommentReq) {
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments", currentMaster, req.Title, req.FromUser, req.CreatedAt.Format(time.RFC3339))
-	if err := Temp.RE.HDel(c,
+	if err := box.Temp.RE.HDel(c,
 		workComment,
 		"from_user",
 		"content",
@@ -236,9 +237,9 @@ func delectCommentMaster1(c *gin.Context, currentMaster string, req *model.Delet
 }
 
 // 用户评论删除缓存处理
-func delectCommentPoster1(c *gin.Context, req *model.DeleteCommentReq) {
+func DelectCommentPoster1(c *gin.Context, req *model.DeleteCommentReq) {
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments", req.Owner, req.Title, req.FromUser, req.CreatedAt.Format(time.RFC3339))
-	if err := Temp.RE.HDel(c,
+	if err := box.Temp.RE.HDel(c,
 		workComment,
 		"from_user",
 		"content",
@@ -250,8 +251,8 @@ func delectCommentPoster1(c *gin.Context, req *model.DeleteCommentReq) {
 }
 
 // 添加头像缓存处理
-func addUserHand2(c *gin.Context, user *model.User) {
-	if err := Temp.RE.HSet(c, user.Username, "userhand", user.UserHand).Err(); err != nil {
+func AddUserHand2(c *gin.Context, user *model.User) {
+	if err := box.Temp.RE.HSet(c, user.Username, "userhand", user.UserHand).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return
 	}

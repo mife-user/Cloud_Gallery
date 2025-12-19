@@ -1,11 +1,13 @@
-package api
+package mysql
 
 import (
 	"fmt"
 	"net/http"
 	"os"
+	"painting/box"
+	"painting/dao/redis"
 	"painting/model"
-	"painting/utils"
+	"painting/web/utils"
 	"path/filepath"
 	"time"
 
@@ -13,8 +15,8 @@ import (
 )
 
 // 数据库注册
-func register(c *gin.Context, u *model.User) int {
-	if ok := Temp.AddUser(u.Username, u.Password); ok {
+func Register(c *gin.Context, u *model.User) int {
+	if ok := box.Temp.AddUser(u.Username, u.Password); ok {
 		c.JSON(200, gin.H{"message": "注册成功！"})
 		return 1
 	}
@@ -22,8 +24,8 @@ func register(c *gin.Context, u *model.User) int {
 }
 
 // 数据库登录
-func login(c *gin.Context, u *model.User) int {
-	if ok := Temp.CheckUser(u.Username, u.Password); ok {
+func Login(c *gin.Context, u *model.User) int {
+	if ok := box.Temp.CheckUser(u.Username, u.Password); ok {
 		token, _ := utils.GenerateToken(u.Username)
 		c.JSON(200, gin.H{
 			"message": "登录成功",
@@ -37,7 +39,7 @@ func login(c *gin.Context, u *model.User) int {
 }
 
 // 数据库挂画
-func uploadPaint(c *gin.Context) {
+func UploadPaint(c *gin.Context) {
 	var work model.Work
 	usernameI, ok := c.Get("username")
 	if !ok {
@@ -73,16 +75,16 @@ func uploadPaint(c *gin.Context) {
 
 	// 5. 写入 DB
 	work.Image = "/uploads/" + uniqueName
-	if ok := Temp.AddWork(username, &work); !ok {
+	if ok := box.Temp.AddWork(username, &work); !ok {
 		c.JSON(500, gin.H{"error": "添加作品到数据库失败"})
 		return
 	}
 	c.JSON(200, gin.H{"message": "ok"})
-	uploadPaint2(c, &work)
+	redis.UploadPaint2(c, &work)
 }
 
 // 数据库删除画
-func delectPaint(c *gin.Context, work *model.Work) {
+func DelectPaint(c *gin.Context, work *model.Work) {
 	username, ok := c.Get("username")
 	if !ok {
 		c.JSON(400, gin.H{"error": "身份验证失败"})
@@ -97,28 +99,28 @@ func delectPaint(c *gin.Context, work *model.Work) {
 		c.JSON(403, gin.H{"error": "没有权限删除别人的作品"})
 		return
 	}
-	if Temp.DelectPaint(name, work.Title) {
+	if box.Temp.DelectPaint(name, work.Title) {
 		c.JSON(200, gin.H{"message": "删除成功"})
 	} else {
 		c.JSON(400, gin.H{"error": "删除失败，找不到画"})
 	}
-	delectPaint2(c, work)
+	redis.DelectPaint2(c, work)
 }
 
 // 数据库看画
-func view(c *gin.Context, who string) {
-	works, err := Temp.GetWorks(who)
+func View(c *gin.Context, who string) {
+	works, err := box.Temp.GetWorks(who)
 	if err != nil {
 		c.JSON(400, gin.H{"error": "数据库错误"})
 		return
 	}
 	c.JSON(200, gin.H{"owner": who, "works": works})
-	view2(c, &works)
+	redis.View2(c, &works)
 }
 
 // 数据库评论
-func postComment(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) bool {
-	if Temp.AddComment(req.TargetAuthor, req.WorkTitle, newComment) {
+func PostComment(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) bool {
+	if box.Temp.AddComment(req.TargetAuthor, req.WorkTitle, newComment) {
 		c.JSON(200, gin.H{"message": "评论成功", "data": newComment})
 		return true
 	} else {
@@ -128,8 +130,8 @@ func postComment(c *gin.Context, newComment *model.Comment, req *model.CommentRe
 }
 
 // 数据库作者删除评论
-func delectCommentMaster(c *gin.Context, currentMaster string, workTitle string, comment *model.Comment) {
-	if Temp.DelectComment(currentMaster, workTitle, comment) {
+func DelectCommentMaster(c *gin.Context, currentMaster string, workTitle string, comment *model.Comment) {
+	if box.Temp.DelectComment(currentMaster, workTitle, comment) {
 		c.JSON(200, gin.H{"message": "作为作者，已删除该评论"})
 	} else {
 		c.JSON(400, gin.H{"error": "删除失败，未找到该评论或画作"})
@@ -137,8 +139,8 @@ func delectCommentMaster(c *gin.Context, currentMaster string, workTitle string,
 }
 
 // 数据库用户删除评论
-func delectCommentPoster(c *gin.Context, req *model.DeleteCommentReq, comment *model.Comment) {
-	if Temp.DelectComment(req.Owner, req.Title, comment) {
+func DelectCommentPoster(c *gin.Context, req *model.DeleteCommentReq, comment *model.Comment) {
+	if box.Temp.DelectComment(req.Owner, req.Title, comment) {
 		c.JSON(200, gin.H{"message": "已撤回您的评论"})
 	} else {
 		c.JSON(400, gin.H{"error": "撤回失败，可能评论已不存在"})
@@ -146,7 +148,7 @@ func delectCommentPoster(c *gin.Context, req *model.DeleteCommentReq, comment *m
 }
 
 // 数据库添加头像
-func addUserHand(c *gin.Context) {
+func AddUserHand(c *gin.Context) {
 	var user model.User
 	if err := c.ShouldBind(&user); err != nil {
 		c.JSON(400, gin.H{"error": "未登录"})
@@ -173,6 +175,6 @@ func addUserHand(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"message": "ok", "path": "/userhands/" + dstName})
 	user.UserHand = "/userhands/" + dstName
-	Temp.AddHand(&user)
-	addUserHand2(c, &user)
+	box.Temp.AddHand(&user)
+	redis.AddUserHand2(c, &user)
 }

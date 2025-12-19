@@ -2,18 +2,18 @@ package api
 
 import (
 	"fmt"
-	"painting/dao"
+	"painting/box"
+	"painting/dao/mysql"
+	"painting/dao/redis"
 	"painting/model"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-var Temp *dao.Database
-
 // 关闭数据库
 func CloseSQL() {
-	if err := Temp.Close(); err != nil {
+	if err := box.Temp.Close(); err != nil {
 		fmt.Print(err)
 		return
 	}
@@ -28,13 +28,13 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	if !register1(c, &u) {
+	if !redis.Register1(c, &u) {
 		return
 	}
-	switch register(c, &u) {
+	switch mysql.Register(c, &u) {
 	case 1:
 		{
-			register2(c, &u)
+			redis.Register2(c, &u)
 		}
 	default:
 		return
@@ -49,13 +49,13 @@ func Login(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "参数填错了"})
 		return
 	}
-	switch login1(c, &u) {
+	switch redis.Login1(c, &u) {
 	case 0:
 		{
 
-			switch login(c, &u) {
+			switch mysql.Login(c, &u) {
 			case 1:
-				login2(c, &u)
+				redis.Login2(c, &u)
 			default:
 				return
 			}
@@ -67,22 +67,22 @@ func Login(c *gin.Context) {
 
 // 挂画
 func UploadPaint(c *gin.Context) {
-	uploadPaint(c)
+	mysql.UploadPaint(c)
 }
 
 // 删画
 func Delect(c *gin.Context) {
 	var w model.Work
-	delectPaint(c, &w)
+	mysql.DelectPaint(c, &w)
 }
 
 // 看展
 func View(c *gin.Context) {
 	who := c.Param("who")
-	if view1(c, who) {
+	if redis.View1(c, who) {
 		return
 	}
-	view(c, who)
+	mysql.View(c, who)
 }
 
 // 评论
@@ -103,8 +103,8 @@ func PostComment(c *gin.Context) {
 		Content:   req.Content,
 		CreatedAt: time.Now(),
 	}
-	if postComment(c, &newComment, &req) {
-		postComment1(c, &newComment, &req)
+	if mysql.PostComment(c, &newComment, &req) {
+		redis.PostComment1(c, &newComment, &req)
 	}
 
 }
@@ -133,8 +133,8 @@ func DelectCommentMaster(c *gin.Context) {
 		CreatedAt: req.CreatedAt,
 	}
 	/*---------------------------------------------------------*/
-	delectCommentMaster1(c, currentMaster, &req)
-	delectCommentMaster(c, currentMaster, req.Title, &comment)
+	redis.DelectCommentMaster1(c, currentMaster, &req)
+	mysql.DelectCommentMaster(c, currentMaster, req.Title, &comment)
 }
 
 // 用户删除评论
@@ -159,11 +159,11 @@ func DelectCommentPoster(c *gin.Context) {
 		Content:   req.Content,
 		CreatedAt: req.CreatedAt,
 	}
-	delectCommentPoster1(c, &req)
-	delectCommentPoster(c, &req, &comment)
+	redis.DelectCommentPoster1(c, &req)
+	mysql.DelectCommentPoster(c, &req, &comment)
 }
 
 // 添加头像
 func AddUserHand(c *gin.Context) {
-	addUserHand(c)
+	mysql.AddUserHand(c)
 }
