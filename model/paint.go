@@ -5,7 +5,7 @@ import "gorm.io/gorm"
 // 作品
 type Work struct {
 	gorm.Model
-	UserID   uint      `gorm:"column:user_id"`
+	UserID   uint      `gorm:"column:user_id;type:int"`
 	Title    string    `gorm:"column:title;type:varchar(255)" form:"title" json:"title"`
 	Image    string    `gorm:"column:image;type:varchar(500)" form:"image" json:"image"`
 	Content  string    `gorm:"column:content;type:longtext" form:"content" json:"content"`

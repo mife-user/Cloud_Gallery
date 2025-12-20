@@ -4,7 +4,6 @@ import (
 	"painting/dao/mysql"
 	"painting/dao/redis"
 	"painting/model"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,9 +22,8 @@ func PostComment(c *gin.Context) {
 		return
 	}
 	newComment := model.Comment{
-		FromUser:  commentator,
-		Content:   req.Content,
-		CreatedAt: time.Now(),
+		FromUser: commentator,
+		Content:  req.Content,
 	}
 	if mysql.PostComment(c, &newComment, &req) {
 		redis.PostComment_read(c, &newComment, &req)
@@ -48,17 +46,16 @@ func DelectCommentMaster(c *gin.Context) {
 		return
 	}
 	if req.Owner != currentMaster {
-		c.JSON(403, gin.H{"error": "只能删除自己作品下的评论"})
+		c.JSON(403, gin.H{"error": "只能删除自己作品下的评论", "message": currentMaster + "!=" + req.Owner})
 		return
 	}
 	comment := model.Comment{
-		FromUser:  req.FromUser,
-		Content:   req.Content,
-		CreatedAt: req.CreatedAt,
+		FromUser: req.FromUser,
+		Content:  req.Content,
 	}
 	/*---------------------------------------------------------*/
-	redis.DelectCommentMaster_read(c, currentMaster, &req)
 	mysql.DelectCommentMaster(c, currentMaster, req.Title, &comment)
+	redis.DelectCommentMaster_read(c, currentMaster, &req)
 }
 
 // 用户删除评论
@@ -79,10 +76,9 @@ func DelectCommentPoster(c *gin.Context) {
 		return
 	}
 	comment := model.Comment{
-		FromUser:  req.FromUser,
-		Content:   req.Content,
-		CreatedAt: req.CreatedAt,
+		FromUser: req.FromUser,
+		Content:  req.Content,
 	}
-	redis.DelectCommentPoster_read(c, &req)
 	mysql.DelectCommentPoster(c, &req, &comment)
+	redis.DelectCommentPoster_read(c, &req)
 }

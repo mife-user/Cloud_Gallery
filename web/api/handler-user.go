@@ -11,7 +11,7 @@ import (
 // 注册
 func Register(c *gin.Context) {
 	var u model.User
-	if err := c.ShouldBind(&u); err != nil {
+	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(400, gin.H{"error": "参数填错了"})
 		return
 	}
@@ -33,7 +33,7 @@ func Register(c *gin.Context) {
 // 登录
 func Login(c *gin.Context) {
 	var u model.User
-	if err := c.ShouldBind(&u); err != nil {
+	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(400, gin.H{"error": "参数填错了"})
 		return
 	}

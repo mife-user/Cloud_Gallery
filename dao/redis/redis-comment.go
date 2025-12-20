@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"painting/box"
 	"painting/model"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,12 +12,12 @@ import (
 
 // 评论缓存处理
 func PostComment_read(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) bool {
-
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments",
 		req.TargetAuthor, req.WorkTitle, newComment.FromUser, newComment.CreatedAt.Format(time.RFC3339))
 
 	if err := box.Temp.RE.HMSet(c,
 		workComment,
+		"id", strconv.FormatUint(uint64(newComment.ID), 10), // 新增：存 id
 		"from_user", newComment.FromUser,
 		"content", newComment.Content,
 		"created_at", newComment.CreatedAt.Format(time.RFC3339),
@@ -30,6 +31,7 @@ func PostComment_read(c *gin.Context, newComment *model.Comment, req *model.Comm
 
 // 作者评论删除缓存处理
 func DelectCommentMaster_read(c *gin.Context, currentMaster string, req *model.DeleteCommentReq) {
+
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments", currentMaster, req.Title, req.FromUser, req.CreatedAt.Format(time.RFC3339))
 	if err := box.Temp.RE.HDel(c,
 		workComment,

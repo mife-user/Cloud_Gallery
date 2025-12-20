@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"painting/box"
 	"painting/model"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -69,7 +70,7 @@ func View_read(c *gin.Context, who string) bool {
 		iterComment := box.Temp.RE.Scan(c, 0, patternComment, 0).Iterator()
 		for iterComment.Next(c) {
 			commentKey := iterComment.Val()
-			commentData, err := box.Temp.RE.HMGet(c, commentKey, "from_user", "content", "created_at").Result()
+			commentData, err := box.Temp.RE.HMGet(c, commentKey, "id", "from_user", "content", "created_at").Result()
 			if err != nil {
 				c.JSON(400, gin.H{"error": "redis服务器错误"})
 				return false
@@ -77,23 +78,27 @@ func View_read(c *gin.Context, who string) bool {
 			if len(commentData) < 3 || commentData[0] == nil || commentData[1] == nil || commentData[2] == nil {
 				continue
 			}
+			var id uint
+			if commentData[0] != nil {
+				if s, ok := commentData[0].(string); ok {
+					if v, err := strconv.ParseUint(s, 10, 64); err == nil {
+						id = uint(v)
+					}
+				}
+			}
+			fromUser, okFU := commentData[1].(string)
+			contentStr, okCT := commentData[2].(string)
 
-			fromUser, okFU := commentData[0].(string)
-			contentStr, okCT := commentData[1].(string)
-			createdAtStr, okCA := commentData[2].(string)
-			if !okFU || !okCT || !okCA {
+			if !okFU || !okCT {
 				continue
 			}
-			createdAt, err := time.Parse(time.RFC3339, createdAtStr)
-			if err != nil {
-				continue
-			}
 
-			comments = append(comments, model.Comment{
-				FromUser:  fromUser,
-				Content:   contentStr,
-				CreatedAt: createdAt,
-			})
+			cm := model.Comment{
+				FromUser: fromUser,
+				Content:  contentStr,
+			}
+			cm.ID = id
+			comments = append(comments, cm)
 		}
 
 		work := model.Work{
