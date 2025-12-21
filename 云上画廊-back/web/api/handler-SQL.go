@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"painting/box"
 	"painting/dao/db"
+	"time"
 )
 
 // 关闭数据库
@@ -17,12 +18,20 @@ func CloseSQL() {
 
 // 初始化数据库
 func InitSQL() {
+	num := 0
+F:
 	var ok bool
+	time.Sleep(3 * time.Second)
 	box.Temp, ok = db.Init()
 	if !ok {
-		fmt.Println("数据库初始化失败，请检查 MySQL 是否已启动，以及 dao.Init 的配置（DSN）是否正确。")
-		fmt.Println("按回车键退出...")
-		fmt.Scanln()
-		return
+		if num < 10 {
+			fmt.Println("加载中...")
+			num++
+			goto F
+		} else {
+			fmt.Println("失败!")
+			return
+		}
 	}
+	fmt.Println("成功!")
 }

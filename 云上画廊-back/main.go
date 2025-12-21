@@ -11,14 +11,12 @@ func main() {
 	// 1. 初始化数据库
 	api.InitSQL()
 	defer api.CloseSQL()
-
 	// 2. 创建默认的路由引擎
 	r := gin.Default()
 
 	// 静态文件服务
 	r.Static("/uploads", "./uploads")
 	r.Static("/userhands", "./userhands")
-	r.StaticFile("/", "./云上画廊.html")
 
 	// 3. 全局中间件：
 	r.Use(middleware.Cors())
