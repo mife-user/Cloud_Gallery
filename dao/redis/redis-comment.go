@@ -17,7 +17,7 @@ func PostComment_read(c *gin.Context, newComment *model.Comment, req *model.Comm
 
 	if err := box.Temp.RE.HMSet(c,
 		workComment,
-		"id", strconv.FormatUint(uint64(newComment.ID), 10), // 新增：存 id
+		"id", strconv.FormatUint(uint64(newComment.ID), 10), 
 		"from_user", newComment.FromUser,
 		"content", newComment.Content,
 		"created_at", newComment.CreatedAt.Format(time.RFC3339),
