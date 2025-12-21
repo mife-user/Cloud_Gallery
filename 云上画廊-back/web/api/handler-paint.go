@@ -1,29 +1,25 @@
 package api
 
 import (
-	"painting/dao/mysql"
-	"painting/dao/redis"
 	"painting/model"
+	"painting/web/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 // 挂画
 func UploadPaint(c *gin.Context) {
-	mysql.UploadPaint(c)
+	service.PaintUp(c)
 }
 
 // 删画
 func Delect(c *gin.Context) {
 	var w model.Work
-	mysql.DelectPaint(c, &w)
+	service.PaintDelect(c, &w)
 }
 
 // 看展
 func View(c *gin.Context) {
 	who := c.Param("who")
-	if redis.View_read(c, who) {
-		return
-	}
-	mysql.View(c, who)
+	service.PaintView(c, who)
 }

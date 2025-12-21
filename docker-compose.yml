@@ -24,7 +24,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:latest
+    image: redis:8.0
     container_name: painting_redis
     restart: always
     command: ["redis-server", "--requirepass", "123456"]

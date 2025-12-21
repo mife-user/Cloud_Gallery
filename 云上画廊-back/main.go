@@ -1,35 +1,26 @@
 package main
 
 import (
-	"fmt"
-	"painting/api"
-	"painting/dao"
-	"painting/middleware"
+	"painting/web/api"
+	"painting/web/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// // 1. 仓库管理员先上班，准备好账本
-	// dao.Init()
-	// 2. 启动 Gin 引擎（默认带了 Logger 和 Recovery 中间件，防崩坏）
-	var ok bool
+	// 1. 初始化数据库
+	api.InitSQL()
 	defer api.CloseSQL()
-	api.Temp, ok = dao.Init()
-	if !ok {
-		fmt.Println("数据库初始化失败，请检查 MySQL 是否已启动，以及 dao.Init 的配置（DSN）是否正确。")
-		fmt.Println("按回车键退出...")
-		fmt.Scanln()
-		return
-	}
+
+	// 2. 创建默认的路由引擎
 	r := gin.Default()
 
-	// 静态文件服务 - 正确配置
+	// 静态文件服务
 	r.Static("/uploads", "./uploads")
 	r.Static("/userhands", "./userhands")
 	r.StaticFile("/", "./云上画廊.html")
 
-	// 3. 全局中间件：安排外交官（CORS）站在大门口，所有请求都要经过它
+	// 3. 全局中间件：
 	r.Use(middleware.Cors())
 
 	// 公共区（不需要证件）

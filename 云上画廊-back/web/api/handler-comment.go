@@ -1,9 +1,8 @@
 package api
 
 import (
-	"painting/dao/mysql"
-	"painting/dao/redis"
 	"painting/model"
+	"painting/web/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,9 +24,7 @@ func PostComment(c *gin.Context) {
 		FromUser: commentator,
 		Content:  req.Content,
 	}
-	if mysql.PostComment(c, &newComment, &req) {
-		redis.PostComment_read(c, &newComment, &req)
-	}
+	service.CommentPost(c, &newComment, &req)
 
 }
 
@@ -54,8 +51,7 @@ func DelectCommentMaster(c *gin.Context) {
 		Content:  req.Content,
 	}
 	/*---------------------------------------------------------*/
-	mysql.DelectCommentMaster(c, currentMaster, req.Title, &comment)
-	redis.DelectCommentMaster_read(c, currentMaster, &req)
+	service.DelectCommentMaster(c, currentMaster, &req, &comment)
 }
 
 // 用户删除评论
@@ -79,6 +75,5 @@ func DelectCommentPoster(c *gin.Context) {
 		FromUser: req.FromUser,
 		Content:  req.Content,
 	}
-	mysql.DelectCommentPoster(c, &req, &comment)
-	redis.DelectCommentPoster_read(c, &req)
+	service.DelectCommentPoster(c, &req, &comment)
 }

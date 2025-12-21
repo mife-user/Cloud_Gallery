@@ -33,7 +33,7 @@ func Init() (*Database, bool) {
 	}
 
 	dsn := fmt.Sprintf("root:123456@tcp(%s:%s)/paint?charset=utf8mb4&parseTime=True&loc=Local", host, port)
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{}) 
 	if err != nil {
 		return nil, false
 	}
