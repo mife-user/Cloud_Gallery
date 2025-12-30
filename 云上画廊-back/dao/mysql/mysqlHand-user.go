@@ -38,12 +38,7 @@ func Login(c *gin.Context, u *model.User) int {
 }
 
 // 数据库添加头像
-func AddUserHand(c *gin.Context) {
-	var user model.User
-	if err := c.ShouldBind(&user); err != nil {
-		c.JSON(400, gin.H{"error": "未登录"})
-		return
-	}
+func AddUserHand(c *gin.Context, user *model.User) {
 	if user.Username == "" {
 		c.JSON(400, gin.H{"error": "username required"})
 		return
@@ -65,6 +60,6 @@ func AddUserHand(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"message": "ok", "path": "/userhands/" + dstName})
 	user.UserHand = "/userhands/" + dstName
-	box.Temp.AddHand(&user)
-	redis.AddUserHand_write(c, &user)
+	box.Temp.AddHand(user)
+	redis.AddUserHand_write(c, user)
 }

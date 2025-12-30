@@ -42,6 +42,6 @@ func UserLogin(c *gin.Context, u *model.User) {
 }
 
 // 添加用户头像服务
-func UserHand(c *gin.Context) {
-	mysql.AddUserHand(c)
+func UserHand(c *gin.Context, user *model.User) {
+	mysql.AddUserHand(c, user)
 }

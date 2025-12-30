@@ -25,26 +25,28 @@ func (d *Database) GetWorks(username string) ([]model.Work, error) {
 }
 
 // 删除画作
-func (d *Database) DelectPaint(username string, workname string) bool {
+func (d *Database) DelectPaint(username string, workname string) int {
 	var user model.User
 	if err := d.DB.Where("username = ?", username).First(&user).Error; err != nil {
-		return false
+		return 0
 	}
 	var work model.Work
 	if err := d.DB.Where("user_id = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
-		return false
+		return 1
 	}
 	if err := d.DB.Delete(&work).Error; err != nil {
-		return false
+		return 2
 	}
 	if work.Image != "" {
 		filePath := strings.TrimPrefix(work.Image, "/")
 		if strings.HasPrefix(filePath, "uploads/") {
-			_ = os.Remove(filePath)
+			err := os.Remove(filePath)
+			if err != nil {
+				return 3
+			}
 		}
 	}
-
-	return true
+	return 4
 }
 
 // 实现添加作品逻辑

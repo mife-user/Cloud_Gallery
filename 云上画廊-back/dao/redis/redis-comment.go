@@ -17,10 +17,11 @@ func PostComment_read(c *gin.Context, newComment *model.Comment, req *model.Comm
 
 	if err := box.Temp.RE.HMSet(c,
 		workComment,
-		"id", strconv.FormatUint(uint64(newComment.ID), 10), 
+		"id", strconv.FormatUint(uint64(newComment.ID), 10),
 		"from_user", newComment.FromUser,
 		"content", newComment.Content,
 		"created_at", newComment.CreatedAt.Format(time.RFC3339),
+		"updated_at", newComment.UpdatedAt.Format(time.RFC3339),
 	).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return false
@@ -38,6 +39,7 @@ func DelectCommentMaster_read(c *gin.Context, currentMaster string, req *model.D
 		"from_user",
 		"content",
 		"created_at",
+		"updated_at",
 	).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return
@@ -52,6 +54,7 @@ func DelectCommentPoster_read(c *gin.Context, req *model.DeleteCommentReq) {
 		"from_user",
 		"content",
 		"created_at",
+		"updated_at",
 	).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return

@@ -74,12 +74,21 @@ func DelectPaint(c *gin.Context, work *model.Work) {
 		c.JSON(403, gin.H{"error": "没有权限删除别人的作品"})
 		return
 	}
-	if box.Temp.DelectPaint(name, work.Title) {
-		c.JSON(200, gin.H{"message": "删除成功"})
-	} else {
+	switch box.Temp.DelectPaint(name, work.Title) {
+	case 0:
+		c.JSON(400, gin.H{"error": "删除失败，找不到用户"})
+	case 1:
 		c.JSON(400, gin.H{"error": "删除失败，找不到画"})
+	case 2:
+		c.JSON(400, gin.H{"error": "删除失败"})
+	case 3:
+		c.JSON(400, gin.H{"error": "文件删除失败"})
+	case 4:
+		c.JSON(200, gin.H{"message": "删除成功"})
+		redis.DePaint_write(c, work)
+	default:
+		c.JSON(400, gin.H{"error": "删除失败"})
 	}
-	redis.DePaint_write(c, work)
 }
 
 // 数据库看画
