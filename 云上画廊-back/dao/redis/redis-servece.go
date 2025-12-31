@@ -17,6 +17,10 @@ func getWorks(c *gin.Context, who string) ([]model.Work, bool) {
 	iter := box.Temp.RE.Scan(c, 0, pattern, 0).Iterator()
 	for iter.Next(c) {
 		workKey := iter.Val()
+		keyStr := fmt.Sprintf("%v", workKey)
+		if len(keyStr) >= 8 && keyStr[len(keyStr)-8:] == "comments" {
+			continue
+		}
 		workData, err := box.Temp.RE.HMGet(c, workKey, "title", "author", "content", "image", "created_at", "updated_at").Result()
 		/*处理错误*/
 		if err != nil {
@@ -92,6 +96,9 @@ func getWorks(c *gin.Context, who string) ([]model.Work, bool) {
 		work.UpdatedAt = updatedTime
 
 		works = append(works, work)
+	}
+	if len(works) == 0 {
+		return nil, false
 	}
 	return works, true
 }

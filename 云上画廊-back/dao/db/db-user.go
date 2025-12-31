@@ -36,7 +36,7 @@ func (d *Database) AddHand(user *model.User) bool {
 	if err := d.DB.Where("username = ?", user.Username).First(&userTemp).Error; err != nil {
 		return false
 	}
-	if err := d.DB.Model(&userTemp).Update("userhand", user.UserHand).Error; err != nil {
+	if err := d.DB.Model(&userTemp).Update("user_hand", user.UserHand).Error; err != nil {
 		return false
 	}
 	return true

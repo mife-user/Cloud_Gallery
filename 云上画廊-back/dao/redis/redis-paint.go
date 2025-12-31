@@ -43,6 +43,13 @@ func DePaint_write(c *gin.Context, u *model.Work) {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
 		return
 	}
+
+	patternComment := fmt.Sprintf("%s:%s:*:*:comments", u.Author, u.Title)
+	iter := box.Temp.RE.Scan(c, 0, patternComment, 0).Iterator()
+	for iter.Next(c) {
+		commentKey := iter.Val()
+		box.Temp.RE.Del(c, commentKey)
+	}
 }
 
 // 看画缓存检查

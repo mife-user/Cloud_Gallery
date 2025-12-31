@@ -16,7 +16,7 @@ func (d *Database) GetWorks(username string) ([]model.Work, error) {
 		return nil, err
 	}
 	var works []model.Work
-	if err := d.DB.Preload("Comments").Where("userid = ?", user.ID).Find(&works).Error; err != nil {
+	if err := d.DB.Preload("Comments").Where("user_id = ?", user.ID).Find(&works).Error; err != nil {
 		return nil, err
 	}
 	return works, nil
@@ -29,8 +29,11 @@ func (d *Database) DelectPaint(username string, workname string) int {
 		return 0
 	}
 	var work model.Work
-	if err := d.DB.Where("userid = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
+	if err := d.DB.Where("user_id = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
 		return 1
+	}
+	if err := d.DB.Where("work_id = ?", work.ID).Delete(&model.Comment{}).Error; err != nil {
+		return 2
 	}
 	if err := d.DB.Delete(&work).Error; err != nil {
 		return 2
