@@ -10,7 +10,7 @@ func (d *Database) AddComment(username string, workname string, comment *model.C
 	}
 
 	var work model.Work
-	if err := d.DB.Where("user_id = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
+	if err := d.DB.Where("userid = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
 		return false
 	}
 
@@ -28,10 +28,10 @@ func (d *Database) DelectComment(username string, workname string, comment *mode
 		return false
 	}
 	var work model.Work
-	if err := d.DB.Where("user_id = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
+	if err := d.DB.Where("userid = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
 		return false
 	}
-	if err := d.DB.Where("work_id = ? AND from_user = ? AND content = ?",
+	if err := d.DB.Where("workid = ? AND fromuser = ? AND content = ?",
 		work.ID, comment.FromUser, comment.Content).Delete(comment).Error; err != nil {
 		return false
 	}

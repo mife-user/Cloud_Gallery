@@ -78,7 +78,7 @@ func View_write(c *gin.Context, works *[]model.Work) {
 
 			if err := box.Temp.RE.HMSet(c,
 				commentKey,
-				"id", strconv.FormatUint(uint64(comment.ID), 64),
+				"id", strconv.FormatUint(uint64(comment.ID), 10),
 				"from_user", comment.FromUser,
 				"content", comment.Content,
 				"created_at", comment.CreatedAt.Format(time.RFC3339),

@@ -16,7 +16,7 @@ func PostComment_read(c *gin.Context, newComment *model.Comment, req *model.Comm
 		req.TargetAuthor, req.WorkTitle, newComment.FromUser, newComment.CreatedAt.Format(time.RFC3339))
 	if err := box.Temp.RE.HMSet(c,
 		workComment,
-		"id", strconv.FormatUint(uint64(newComment.ID), 64),
+		"id", strconv.FormatUint(uint64(newComment.ID), 10),
 		"from_user", newComment.FromUser,
 		"content", newComment.Content,
 		"created_at", newComment.CreatedAt.Format(time.RFC3339),
