@@ -14,10 +14,9 @@ import (
 func PostComment_read(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) bool {
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments",
 		req.TargetAuthor, req.WorkTitle, newComment.FromUser, newComment.CreatedAt.Format(time.RFC3339))
-
 	if err := box.Temp.RE.HMSet(c,
 		workComment,
-		"id", strconv.FormatUint(uint64(newComment.ID), 10),
+		"id", strconv.FormatUint(uint64(newComment.ID), 64),
 		"from_user", newComment.FromUser,
 		"content", newComment.Content,
 		"created_at", newComment.CreatedAt.Format(time.RFC3339),
@@ -36,6 +35,7 @@ func DelectCommentMaster_read(c *gin.Context, currentMaster string, req *model.D
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments", currentMaster, req.Title, req.FromUser, req.CreatedAt.Format(time.RFC3339))
 	if err := box.Temp.RE.HDel(c,
 		workComment,
+		"id",
 		"from_user",
 		"content",
 		"created_at",
@@ -51,6 +51,7 @@ func DelectCommentPoster_read(c *gin.Context, req *model.DeleteCommentReq) {
 	workComment := fmt.Sprintf("%s:%s:%s:%s:comments", req.Owner, req.Title, req.FromUser, req.CreatedAt.Format(time.RFC3339))
 	if err := box.Temp.RE.HDel(c,
 		workComment,
+		"id",
 		"from_user",
 		"content",
 		"created_at",

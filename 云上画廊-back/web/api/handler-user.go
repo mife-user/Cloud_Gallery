@@ -29,10 +29,16 @@ func Login(c *gin.Context) {
 
 // 添加头像
 func AddUserHand(c *gin.Context) {
-	var user model.User
-	if err := c.ShouldBind(&user); err != nil {
-		c.JSON(400, gin.H{"error": "未登录"})
+	username, ok := c.Get("username")
+	if !ok {
+		c.JSON(401, gin.H{"error": "未登录"})
 		return
 	}
+	var user model.User
+	if err := c.ShouldBind(&user); err != nil {
+		c.JSON(400, gin.H{"error": "参数错误"})
+		return
+	}
+	user.Username = username.(string)
 	service.UserHand(c, &user)
 }

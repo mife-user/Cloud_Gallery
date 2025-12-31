@@ -19,9 +19,7 @@ func (d *Database) GetWorks(username string) ([]model.Work, error) {
 	if err := d.DB.Preload("Comments").Where("user_id = ?", user.ID).Find(&works).Error; err != nil {
 		return nil, err
 	}
-	copyWorks := make([]model.Work, len(works))
-	copy(copyWorks, works)
-	return copyWorks, nil
+	return works, nil
 }
 
 // 删除画作

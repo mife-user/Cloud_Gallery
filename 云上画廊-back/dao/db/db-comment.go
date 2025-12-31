@@ -31,11 +31,8 @@ func (d *Database) DelectComment(username string, workname string, comment *mode
 	if err := d.DB.Where("user_id = ? AND title = ?", user.ID, workname).First(&work).Error; err != nil {
 		return false
 	}
-	if err := d.DB.Where("work_id = ? AND from_user = ? AND created_at = ?",
-		work.ID, comment.FromUser, comment.CreatedAt).First(comment).Error; err != nil {
-		return false
-	}
-	if err := d.DB.Model(&work).Association("Comments").Delete(comment); err != nil {
+	if err := d.DB.Where("work_id = ? AND from_user = ? AND content = ?",
+		work.ID, comment.FromUser, comment.Content).Delete(comment).Error; err != nil {
 		return false
 	}
 	return true
