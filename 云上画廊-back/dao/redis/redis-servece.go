@@ -11,7 +11,8 @@ import (
 )
 
 /*扫描作品*/
-func getWorks(c *gin.Context, works *[]model.Work, who string) bool {
+func getWorks(c *gin.Context, who string) ([]model.Work, bool) {
+	var works []model.Work
 	pattern := fmt.Sprintf("%s:*", who)
 	iter := box.Temp.RE.Scan(c, 0, pattern, 0).Iterator()
 	for iter.Next(c) {
@@ -20,7 +21,7 @@ func getWorks(c *gin.Context, works *[]model.Work, who string) bool {
 		/*处理错误*/
 		if err != nil {
 			c.JSON(400, gin.H{"error": "redis服务器错误"})
-			return false
+			return nil, false
 		}
 		/*空值检查*/
 		if workData[0] == nil || workData[1] == nil || workData[2] == nil || workData[3] == nil || workData[4] == nil || workData[5] == nil {
@@ -51,7 +52,7 @@ func getWorks(c *gin.Context, works *[]model.Work, who string) bool {
 			/*处理错误*/
 			if err != nil {
 				c.JSON(400, gin.H{"error": "redis服务器错误"})
-				return false
+				return nil, false
 			}
 			/*错误处理*/
 			if len(commentData) < 5 || commentData[0] == nil || commentData[1] == nil || commentData[2] == nil || commentData[3] == nil || commentData[4] == nil {
@@ -90,7 +91,7 @@ func getWorks(c *gin.Context, works *[]model.Work, who string) bool {
 		work.CreatedAt = createdTime
 		work.UpdatedAt = updatedTime
 
-		*works = append(*works, work)
+		works = append(works, work)
 	}
-	return true
+	return works, true
 }

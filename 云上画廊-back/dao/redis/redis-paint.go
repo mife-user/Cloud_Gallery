@@ -47,8 +47,7 @@ func DePaint_write(c *gin.Context, u *model.Work) {
 
 // 看画缓存检查
 func View_read(c *gin.Context, who string) bool {
-	var works []model.Work
-	ok := getWorks(c, &works, who)
+	works, ok := getWorks(c, who)
 	if !ok {
 		return false
 	}

@@ -10,9 +10,9 @@ import (
 
 // 发布评论服务
 func CommentPost(c *gin.Context, newComment *model.Comment, req *model.CommentRequest) {
-	if mysql.PostComment(c, newComment, req) {
-		redis.PostComment_read(c, newComment, req)
-	}
+	mysql.PostComment(c, newComment, req)
+	redis.PostComment_read(c, newComment, req)
+
 }
 
 // 作者删除评论服务
