@@ -25,7 +25,7 @@ func (d *Database) Close() error {
 
 // 初始化
 func Init() (*Database, bool) {
-	// MySQL
+	// 获取环境变量
 	host := getenvDefault("DB_HOST", "mysql")
 	port := getenvDefault("DB_PORT", "3306")
 	user := getenvDefault("DB_USER", "root")

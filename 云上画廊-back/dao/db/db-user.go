@@ -5,28 +5,28 @@ import (
 )
 
 // 查人（给登录用）
-func (d *Database) CheckUser(username, password string) bool {
+func (d *Database) CheckUser(username, password string) error {
 	user := model.User{
 		Username: username,
 		Password: password,
 	}
 	if err := d.DB.Where("username = ? AND password = ?", username, password).First(&user).Error; err != nil {
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 // 加人（给注册用）
-func (d *Database) AddUser(username, password string) bool {
+func (d *Database) AddUser(username, password string) error {
 	user := model.User{
 		Username: username,
 		Password: password,
 	}
 
 	if err := d.DB.Create(&user).Error; err != nil {
-		return false
+		return err
 	}
-	return true
+	return nil
 
 }
 

@@ -1,8 +1,9 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
-	"net/http"
+	"mime/multipart"
 	"os"
 	"painting/box"
 	"painting/dao/redis"
@@ -14,81 +15,41 @@ import (
 )
 
 // 数据库挂画
-func UploadPaint(c *gin.Context) {
-	var work model.Work
-	usernameI, ok := c.Get("username")
-	if !ok {
-		c.JSON(401, gin.H{"error": "未认证"})
-		return
-	}
-	username, _ := usernameI.(string)
-	title := c.PostForm("title")
-	if title == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title 必填"})
-		return
-	}
-	work.Content = c.PostForm("content")
-	work.Author = username
-	work.Title = title
-	file, err := c.FormFile("image")
-	if err != nil {
-		c.JSON(400, gin.H{"error": "必须上传图片文件"})
-		return
-	}
-
+func UploadPaint(c *gin.Context, work *model.Work, file *multipart.FileHeader) error {
 	ext := filepath.Ext(file.Filename)
-	uniqueName := fmt.Sprintf("%s_%d%s", username, time.Now().UnixNano(), ext)
+	uniqueName := fmt.Sprintf("%s_%d%s", work.Author, time.Now().UnixNano(), ext)
 	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
 		c.JSON(500, gin.H{"error": "创建目录失败"})
-		return
+		return err
 	}
 	filePath := filepath.Join("uploads", uniqueName)
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(500, gin.H{"error": "保存文件失败"})
-		return
+		return err
 	}
 
 	// 5. 写入 DB
 	work.Image = "/uploads/" + uniqueName
-	if ok := box.Temp.AddWork(username, &work); !ok {
+	if err := box.Temp.AddWork(work.Author, work); err != nil {
 		c.JSON(500, gin.H{"error": "添加作品到数据库失败"})
-		return
+		return err
 	}
 	c.JSON(200, gin.H{"message": "ok"})
-	redis.UpPaint_write(c, &work)
+	return nil
 }
 
 // 数据库删除画
-func DelectPaint(c *gin.Context, work *model.Work) {
-	username, ok := c.Get("username")
-	if !ok {
-		c.JSON(400, gin.H{"error": "身份验证失败"})
-		return
-	}
-	name := username.(string)
-	if err := c.ShouldBindJSON(&work); err != nil {
-		c.JSON(400, gin.H{"error": "参数错误"})
-		return
-	}
+func DelectPaint(c *gin.Context, work *model.Work, name string) error {
 	if work.Author != "" && work.Author != name {
 		c.JSON(403, gin.H{"error": "没有权限删除别人的作品"})
-		return
+		return errors.New("数据库删除画作权限错误")
 	}
-	switch box.Temp.DelectPaint(name, work.Title) {
-	case 0:
-		c.JSON(400, gin.H{"error": "删除失败，找不到用户"})
-	case 1:
-		c.JSON(400, gin.H{"error": "删除失败，找不到画"})
-	case 2:
-		c.JSON(400, gin.H{"error": "删除失败"})
-	case 3:
-		c.JSON(400, gin.H{"error": "文件删除失败"})
-	case 4:
-		c.JSON(200, gin.H{"message": "删除成功"})
-		redis.DePaint_write(c, work)
-	default:
-		c.JSON(400, gin.H{"error": "删除失败"})
+	if err := box.Temp.DelectPaint(name, work.Title); err != nil {
+		c.JSON(400, gin.H{"error": "数据库删除失败"})
+		return err
 	}
+	c.JSON(200, gin.H{"message": "删除成功"})
+	return nil
 }
 
 // 数据库看画

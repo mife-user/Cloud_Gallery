@@ -18,6 +18,7 @@ func getWorks(c *gin.Context, who string) ([]model.Work, bool) {
 	for iter.Next(c) {
 		workKey := iter.Val()
 		keyStr := fmt.Sprintf("%v", workKey)
+		/*字符串判断*/
 		if len(keyStr) >= 8 && keyStr[len(keyStr)-8:] == "comments" {
 			continue
 		}
@@ -42,9 +43,14 @@ func getWorks(c *gin.Context, who string) ([]model.Work, bool) {
 		if !okTitle || !okAuthor || !okContent || !okImage || !okCreated || !okUpdated {
 			continue
 		}
-		createdTime, _ := time.Parse(time.RFC3339, created_at)
-		updatedTime, _ := time.Parse(time.RFC3339, updated_at)
-
+		createdTime, errCT := time.Parse(time.RFC3339, created_at)
+		if errCT != nil {
+			return nil, false
+		}
+		updatedTime, errUT := time.Parse(time.RFC3339, updated_at)
+		if errUT != nil {
+			return nil, false
+		}
 		/*--------------------------------------------------------------------------*/
 		/*扫描评论*/
 		var comments []model.Comment
@@ -71,8 +77,14 @@ func getWorks(c *gin.Context, who string) ([]model.Work, bool) {
 			if !okIdC || !okFromC || !okContentC || !okCreatedC || !okUpdatedC {
 				continue
 			}
-			createdTimeComment, _ := time.Parse(time.RFC3339, created_atC)
-			updatedTimeComment, _ := time.Parse(time.RFC3339, updated_atC)
+			createdTimeComment, errCTC := time.Parse(time.RFC3339, created_atC)
+			if errCTC != nil {
+				return nil, false
+			}
+			updatedTimeComment, errUTC := time.Parse(time.RFC3339, updated_atC)
+			if errUTC != nil {
+				return nil, false
+			}
 			idCommentUint, _ := strconv.ParseUint(idC, 10, 64)
 			/*加入数组*/
 			cm := model.Comment{

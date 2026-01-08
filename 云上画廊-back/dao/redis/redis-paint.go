@@ -11,7 +11,7 @@ import (
 )
 
 // 挂画缓存处理
-func UpPaint_write(c *gin.Context, u *model.Work) {
+func UpPaint_write(c *gin.Context, u *model.Work) error {
 	userWork := fmt.Sprintf("%s:%s", u.Author, u.Title)
 	if err := box.Temp.RE.HMSet(c,
 		userWork,
@@ -23,13 +23,14 @@ func UpPaint_write(c *gin.Context, u *model.Work) {
 		"updated_at", u.CreatedAt.Format(time.RFC3339),
 	).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
-		return
+		return err
 	}
 	box.Temp.RE.Expire(c, userWork, 2*time.Hour)
+	return nil
 }
 
 // 删画缓存处理
-func DePaint_write(c *gin.Context, u *model.Work) {
+func DePaint_write(c *gin.Context, u *model.Work) error {
 	userWork := fmt.Sprintf("%s:%s", u.Author, u.Title)
 	if err := box.Temp.RE.HDel(c,
 		userWork,
@@ -41,7 +42,7 @@ func DePaint_write(c *gin.Context, u *model.Work) {
 		"updated_at",
 	).Err(); err != nil {
 		c.JSON(400, gin.H{"error": "redis服务器错误"})
-		return
+		return err
 	}
 
 	patternComment := fmt.Sprintf("%s:%s:*:*:comments", u.Author, u.Title)
@@ -50,6 +51,7 @@ func DePaint_write(c *gin.Context, u *model.Work) {
 		commentKey := iter.Val()
 		box.Temp.RE.Del(c, commentKey)
 	}
+	return nil
 }
 
 // 看画缓存检查
